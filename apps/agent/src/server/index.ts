@@ -4,6 +4,7 @@ import { authorized, createOAuthPlugin } from "@dkg/plugin-oauth";
 import dkgEssentialsPlugin from "@dkg/plugin-dkg-essentials";
 import createFsBlobStorage from "@dkg/plugin-dkg-essentials/createFsBlobStorage";
 import examplePlugin from "@dkg/plugin-example";
+import healthGuardianPlugin from "@dkg/plugin-health-guardian";
 import swaggerPlugin from "@dkg/plugin-swagger";
 //@ts-expect-error No types for dkg.js ...
 import DKG from "dkg.js";
@@ -107,6 +108,7 @@ const app = createPluginServer({
     },
     accountManagementPlugin,
     dkgEssentialsPlugin,
+    healthGuardianPlugin,
     examplePlugin.withNamespace("protected", {
       middlewares: [authorized(["scope123"])], // Allow only users with the "scope123" scope
     }),
