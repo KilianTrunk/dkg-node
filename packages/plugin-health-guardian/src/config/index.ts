@@ -1,6 +1,6 @@
 // DKG Edge Node Configuration - matches agent setup
 export const DKG_CONFIG = {
-  endpoint: process.env.DKG_OTNODE_URL || "https://astrosat-parachain-rpc.origin-trail.network",
+  endpoint: process.env.DKG_OTNODE_URL || "http://localhost:8900",
   blockchain: {
     name: process.env.DKG_BLOCKCHAIN || "otp:20430", // OriginTrail Parachain Testnet
     rpcEndpoints: [
