@@ -171,5 +171,6 @@ export const TOKEN_CONFIG = {
 
 export const PAYMENT_CONFIG = {
   enabled: process.env.HG_PAYMENT_ENABLED === "true",
-  stablecoinAddress: process.env.HG_STABLECOIN_ADDRESS
+  stablecoinAddress: process.env.HG_STABLECOIN_ADDRESS,
+  micropaymentThreshold: parseFloat(process.env.HG_MICROPAYMENT_THRESHOLD || "0.01")
 };

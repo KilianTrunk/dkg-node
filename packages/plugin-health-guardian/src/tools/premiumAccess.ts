@@ -25,7 +25,6 @@ export function registerPremiumAccessTool(
     },
     async ({ noteId, paymentAmount }) => {
       try {
-        // In real implementation, get userId from auth context
         const userId = "demo_user"; // Mock user ID
 
         // Check if user already has premium access

@@ -3,7 +3,7 @@ import type { DkgPublishResult, DkgAsset, IDkgService } from "../types";
 import { dkgLogger } from "./Logger";
 
 /**
- * DKG Edge Node Service - Real DKG integration
+ * DKG Edge Node ServiceReal DKG integration
  */
 export class DkgService implements IDkgService {
   private dkgClient: any = null;
@@ -27,7 +27,7 @@ export class DkgService implements IDkgService {
   }
 
   /**
-   * Publish a Knowledge Asset to the DKG using real DKG Edge Node
+   * Publish a Knowledge Asset to the DKG
    */
   async publishKnowledgeAsset(content: any, privacy: "private" | "public" = "private"): Promise<DkgPublishResult> {
     if (!this.dkgClient) {
@@ -76,7 +76,7 @@ export class DkgService implements IDkgService {
   }
 
   /**
-   * Retrieve a Knowledge Asset from the DKG using real DKG Edge Node
+   * Retrieve a Knowledge Asset from the DKG
    */
   async getKnowledgeAsset(ual: string): Promise<DkgAsset | null> {
     if (!this.dkgClient) {
@@ -92,7 +92,6 @@ export class DkgService implements IDkgService {
     dkgLogger.info("Retrieving Knowledge Asset from DKG", { ual });
 
     try {
-      // Use real DKG Edge Node (following working pattern from dkg-publisher)
       const result = await this.dkgClient.asset.get(ual, {
         includeMetadata: true
       });
@@ -123,8 +122,6 @@ export class DkgService implements IDkgService {
     dkgLogger.info("Querying DKG for health assets", { queryPreview: sparqlQuery.substring(0, 100) + "..." });
 
     try {
-      // Note: This would use the graph.query method if available
-      // For now, this is a placeholder for SPARQL-based discovery
       const result = await this.dkgClient.graph?.query?.(sparqlQuery, "SELECT");
       return result;
     } catch (error) {
@@ -135,7 +132,6 @@ export class DkgService implements IDkgService {
 
   /**
    * Mock publishing for development
-   * TODO: Remove when real DKG integration is complete
    */
   private async mockPublish(content: any): Promise<DkgPublishResult> {
     // Simulate network delay
@@ -154,7 +150,6 @@ export class DkgService implements IDkgService {
 
   /**
    * Mock retrieval for development
-   * TODO: Remove when real DKG integration is complete
    */
   private async mockGet(ual: string): Promise<any> {
     // Simulate network delay
@@ -174,11 +169,9 @@ export class DkgService implements IDkgService {
   }
 
   /**
-   * Execute SPARQL query on DKG
-   * TODO: Implement real SPARQL integration
+   * Mock SPARQL query for development
    */
   async executeSparqlQuery(query: string) {
-    // TODO: Implement SPARQL query functionality
     dkgLogger.info("SPARQL query requested", { queryPreview: query.substring(0, 100) + "..." });
     return {
       success: false,
