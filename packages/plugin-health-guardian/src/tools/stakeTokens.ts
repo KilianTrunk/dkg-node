@@ -29,7 +29,7 @@ export function registerStakeTokensTool(
         // Check if user already staked on this note
         const existingStakes = await db.select()
           .from(stakes)
-          .where(db.sql`${stakes.noteId} = ${noteId} AND ${stakes.userId} = ${userId}`);
+          .where(sql`${stakes.noteId} = ${noteId} AND ${stakes.userId} = ${userId}`);
 
         if (existingStakes.length > 0) {
           return {

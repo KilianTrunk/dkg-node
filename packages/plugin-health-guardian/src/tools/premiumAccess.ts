@@ -29,7 +29,7 @@ export function registerPremiumAccessTool(
         // Check if user already has premium access
         const existingAccess = await db.select()
           .from(premiumAccess)
-          .where(db.sql`${premiumAccess.noteId} = ${noteId} AND ${premiumAccess.userId} = ${userId} AND ${premiumAccess.expiresAt} > datetime('now')`);
+          .where(sql`${premiumAccess.noteId} = ${noteId} AND ${premiumAccess.userId} = ${userId} AND ${premiumAccess.expiresAt} > datetime('now')`);
 
         if (existingAccess.length > 0) {
           return {

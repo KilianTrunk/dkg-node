@@ -47,6 +47,7 @@ export interface StakeResult {
     support: number;
     oppose: number;
   };
+  transactionHash?: string;
 }
 
 // Premium access types
