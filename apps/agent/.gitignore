@@ -40,6 +40,8 @@ app-example
 
 # SQLite
 *.db
+*.db-wal
+*.db-shm
 
 # Playwright
 playwright-report/

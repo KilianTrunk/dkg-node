@@ -208,6 +208,7 @@ export interface ITokenomicsService {
 
 export interface IPaymentService {
   initialize(): Promise<void>;
+  requestPremiumAccess(userId: string, noteId: string, amount: number): Promise<{ paymentUrl: string; paymentId: string; paymentHeaders: Record<string, string> }>;
   processPremiumAccess(request: PremiumAccessRequest): Promise<PremiumAccess>;
 }
 
