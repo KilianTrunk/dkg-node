@@ -203,7 +203,7 @@ export class TokenomicsService {
 
     console.log("Mock token staking successful:", stakeId);
 
-    // Mock consensus (in real implementation, this would be queried from blockchain)
+    // Mock consensus
     const consensus = await this.getCommunityConsensus(noteId);
 
     return {

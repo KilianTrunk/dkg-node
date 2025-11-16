@@ -25,7 +25,6 @@ export function registerStakeTokensTool(
     },
     async ({ noteId, amount, position, reasoning }) => {
       try {
-        // In real implementation, get userId from auth context
         const userId = "demo_user"; // Mock user ID
 
         // Check if user already staked on this note
