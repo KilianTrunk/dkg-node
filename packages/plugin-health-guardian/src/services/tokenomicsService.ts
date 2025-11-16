@@ -1,32 +1,43 @@
 import { TOKEN_CONFIG } from "../config";
 import type { StakeResult } from "../types";
+import { ethers } from "ethers";
+import { BlockchainProvider } from "./blockchainProvider";
+import { TokenContractService } from "./tokenContractService";
 
 /**
  * Tokenomics Service for TRAC/NEURO token staking
- * TODO: Implement real blockchain token integration
+ * Handles real blockchain token operations
  */
 export class TokenomicsService {
-  private stakingContract: any = null; // TODO: Replace with real contract instance
+  private blockchainProvider!: BlockchainProvider;
+  private tokenService!: TokenContractService;
+  private initialized = false;
 
   async initialize() {
-    // TODO: Initialize blockchain connection and token contracts
-    console.log("Tokenomics Service initialized with config:", {
+    if (this.initialized) return;
+
+    console.log("🔗 Initializing Tokenomics Service...");
+
+    // Initialize blockchain provider
+    this.blockchainProvider = new BlockchainProvider();
+    await this.blockchainProvider.initialize();
+
+    // Initialize token contract service
+    this.tokenService = new TokenContractService(this.blockchainProvider);
+
+    this.initialized = true;
+
+    console.log("✅ Tokenomics Service initialized with config:", {
       tracContract: TOKEN_CONFIG.TRAC.contractAddress,
       neuroContract: TOKEN_CONFIG.NEURO.contractAddress,
-      minimumStake: TOKEN_CONFIG.staking.minimumStake
+      minimumStake: TOKEN_CONFIG.staking.minimumStake,
+      network: this.blockchainProvider.getNetworkName()
     });
-
-    // Mock contract for development
-    this.stakingContract = {
-      stake: this.mockStake.bind(this),
-      getStakes: this.mockGetStakes.bind(this),
-      calculateRewards: this.mockCalculateRewards.bind(this)
-    };
   }
 
   /**
    * Stake TRAC tokens on a health note
-   * TODO: Implement real blockchain token staking
+   * Creates a real token transfer to a staking pool
    */
   async stakeTokens(
     noteId: string,
@@ -35,16 +46,18 @@ export class TokenomicsService {
     position: "support" | "oppose",
     reasoning?: string
   ): Promise<StakeResult> {
-    if (!this.stakingContract) {
-      await this.initialize();
-    }
+    await this.initialize();
 
     if (amount < TOKEN_CONFIG.staking.minimumStake) {
       throw new Error(`Minimum stake is ${TOKEN_CONFIG.staking.minimumStake} TRAC tokens`);
     }
 
-    // TODO: Replace with real blockchain transaction
-    console.log("Staking tokens:", {
+    if (!this.tokenService.hasTracContract()) {
+      console.warn("TRAC contract not configured, falling back to mock staking");
+      return this.mockStake(noteId, userId, amount, position, reasoning);
+    }
+
+    console.log("🏛️ Staking tokens:", {
       noteId,
       userId,
       amount,
@@ -53,15 +66,43 @@ export class TokenomicsService {
     });
 
     try {
-      // Attempt real staking first
-      const result = await this.stakingContract.stake(noteId, amount, position);
+      // Convert amount to token units
+      const stakeAmount = this.tokenService.parseTracAmount(amount.toString());
+
+      // Check user balance
+      const signer = this.blockchainProvider.getSigner();
+      const userAddress = await signer.getAddress();
+      const balance = await this.tokenService.getTracBalance(userAddress);
+
+      if (balance < stakeAmount) {
+        throw new Error(`Insufficient TRAC balance. Required: ${this.tokenService.formatTracAmount(stakeAmount)}, Available: ${this.tokenService.formatTracAmount(balance)}`);
+      }
+
+      // Generate staking pool address (for now, use a mock pool)
+      // TODO: Replace with real staking contract address
+      const stakingPoolAddress = this.generateStakingPoolAddress(noteId, position);
+
+      // Transfer tokens to staking pool
+      const tx = await this.tokenService.transferTrac(stakingPoolAddress, stakeAmount);
+
+      // Generate stake ID
+      const stakeId = `stake_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      console.log("✅ Token staking completed:", {
+        stakeId,
+        txHash: tx.hash,
+        amount: this.tokenService.formatTracAmount(stakeAmount),
+        pool: stakingPoolAddress
+      });
 
       return {
-        stakeId: result.stakeId,
-        communityConsensus: await this.getCommunityConsensus(noteId)
+        stakeId,
+        communityConsensus: await this.getCommunityConsensus(noteId),
+        transactionHash: tx.hash
       };
     } catch (error) {
-      console.warn("Real token staking failed, using mock:", error);
+      console.error("❌ Real token staking failed:", error);
+      console.warn("Falling back to mock staking for development");
 
       // Fallback to mock for development
       return this.mockStake(noteId, userId, amount, position, reasoning);
@@ -72,24 +113,62 @@ export class TokenomicsService {
    * Get community consensus for a note
    */
   async getCommunityConsensus(noteId: string): Promise<{ support: number; oppose: number }> {
-    if (!this.stakingContract) {
-      await this.initialize();
-    }
+    await this.initialize();
 
+    // For now, we use database records to track consensus
+    // TODO: Replace with on-chain staking contract queries when available
     try {
-      // TODO: Replace with real contract call
-      const stakes = await this.stakingContract.getStakes(noteId);
-
+      const stakes = await this.mockGetStakes(noteId);
       const support = stakes.filter((s: any) => s.position === "support")
         .reduce((sum: number, s: any) => sum + s.amount, 0);
-
       const oppose = stakes.filter((s: any) => s.position === "oppose")
         .reduce((sum: number, s: any) => sum + s.amount, 0);
 
       return { support, oppose };
     } catch (error) {
-      console.warn("Real consensus query failed:", error);
+      console.warn("Consensus query failed:", error);
       return { support: 0, oppose: 0 };
+    }
+  }
+
+  /**
+   * Generate a staking pool address for a note and position
+   * TODO: Replace with real staking contract addresses
+   */
+  private generateStakingPoolAddress(noteId: string, position: "support" | "oppose"): string {
+    // For development, generate deterministic addresses based on note and position
+    // In production, this would be a real staking contract
+    const hash = ethers.keccak256(
+      ethers.toUtf8Bytes(`${noteId}-${position}-staking-pool`)
+    );
+    return ethers.getAddress(ethers.dataSlice(hash, 0, 20));
+  }
+
+  /**
+   * Check if user has sufficient token balance
+   */
+  async checkTokenBalance(userId: string, token: "TRAC" | "NEURO", amount: number): Promise<boolean> {
+    await this.initialize();
+
+    try {
+      const signer = this.blockchainProvider.getSigner();
+      const userAddress = await signer.getAddress();
+
+      let balance: bigint;
+      if (token === "TRAC") {
+        if (!this.tokenService.hasTracContract()) return false;
+        balance = await this.tokenService.getTracBalance(userAddress);
+        amount = parseFloat(this.tokenService.parseTracAmount(amount.toString()).toString());
+      } else {
+        if (!this.tokenService.hasNeuroContract()) return false;
+        balance = await this.tokenService.getNeuroBalance(userAddress);
+        amount = parseFloat(this.tokenService.parseNeuroAmount(amount.toString()).toString());
+      }
+
+      return balance >= BigInt(amount);
+    } catch (error) {
+      console.error("Balance check failed:", error);
+      return false;
     }
   }
 

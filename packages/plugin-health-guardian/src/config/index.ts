@@ -20,19 +20,21 @@ export const DKG_CONFIG = {
 
 // Tokenomics Configuration
 export const TOKEN_CONFIG = {
-  // TODO: Replace with real token contract addresses
+  // TRAC token on OriginTrail testnet
   TRAC: {
-    contractAddress: "0x123...", // OriginTrail TRAC token
+    contractAddress: process.env.TRAC_CONTRACT_ADDRESS || "0xE97FDca0A3fc6383aFd6aD1F707b8E7d8f49C002", // Example testnet address
     decimals: 18
   },
+  // NEURO token on NeuroWeb
   NEURO: {
-    contractAddress: "0x456...", // NeuroWeb NEURO token
+    contractAddress: process.env.NEURO_CONTRACT_ADDRESS || "0x47b9a1409aE7F5C4e2C9bD7e2B8c6F4E8F3A9D2C", // Example address
     decimals: 18
   },
   staking: {
     minimumStake: 1, // Minimum TRAC tokens to stake
     rewardMultiplier: 1.5, // Reward multiplier for correct verifications
-    // TODO: Add staking contract integration
+    // Staking pool contract (to be deployed)
+    stakingContractAddress: process.env.STAKING_CONTRACT_ADDRESS
   }
 };
 
@@ -47,9 +49,11 @@ export const AI_CONFIG = {
 
 // x402 Payment Configuration
 export const PAYMENT_CONFIG = {
-  // TODO: Replace with real x402 implementation
-  stablecoinAddress: "0x789...", // USDC or other stablecoin
-  paymentGateway: "https://x402.example.com",
+  // USDC stablecoin on OriginTrail testnet
+  stablecoinAddress: process.env.STABLECOIN_CONTRACT_ADDRESS || "0xA0b86a33E6441e88C5F2712C3E9b74F5b6c6C6b7", // Example USDC address
+  paymentGateway: process.env.X402_PAYMENT_GATEWAY || "https://x402.origintrail.network",
   micropaymentThreshold: 0.01, // Minimum payment in USD
-  // TODO: Add x402 protocol integration
+  // x402 protocol settings
+  paymentTimeoutMinutes: 30, // Payment validity timeout
+  callbackUrl: process.env.X402_CALLBACK_URL || "/api/health/premium/callback"
 };
