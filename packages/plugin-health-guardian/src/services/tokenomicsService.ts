@@ -114,17 +114,9 @@ export class TokenomicsService {
    */
   async getCommunityConsensus(noteId: string): Promise<{ support: number; oppose: number }> {
     await this.initialize();
-
-    // For now, we use database records to track consensus
     // TODO: Replace with on-chain staking contract queries when available
     try {
-      const stakes = await this.mockGetStakes(noteId);
-      const support = stakes.filter((s: any) => s.position === "support")
-        .reduce((sum: number, s: any) => sum + s.amount, 0);
-      const oppose = stakes.filter((s: any) => s.position === "oppose")
-        .reduce((sum: number, s: any) => sum + s.amount, 0);
-
-      return { support, oppose };
+      return { support: 0, oppose: 0 };
     } catch (error) {
       console.warn("Consensus query failed:", error);
       return { support: 0, oppose: 0 };
@@ -215,26 +207,4 @@ export class TokenomicsService {
     };
   }
 
-  /**
-   * Mock consensus query
-   */
-  private async mockGetStakes(noteId: string) {
-    // TODO: Replace with real blockchain query
-    return [
-      { position: "support", amount: 50 },
-      { position: "oppose", amount: 25 },
-      { position: "support", amount: 100 }
-    ];
-  }
-
-  /**
-   * Mock reward calculation
-   */
-  private async mockCalculateRewards(noteId: string, finalVerdict: string) {
-    // TODO: Implement real reward calculation
-    return {
-      totalRewards: 0,
-      individualRewards: []
-    };
-  }
 }
