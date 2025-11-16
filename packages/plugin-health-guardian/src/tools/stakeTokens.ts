@@ -1,9 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { DkgContext } from "@dkg/plugins";
 import { sql } from "drizzle-orm";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { StakeSchema } from "../types";
-import { TokenomicsService } from "../services/tokenomicsService";
+import { ITokenomicsService } from "../types";
 import { stakes } from "../database";
+import * as schema from "../database/schema";
 
 /**
  * Stake Tokens on Health Note MCP Tool
@@ -11,8 +13,8 @@ import { stakes } from "../database";
 export function registerStakeTokensTool(
   mcp: McpServer,
   ctx: DkgContext,
-  tokenomicsService: TokenomicsService,
-  db: any // TODO: Replace with proper database type
+  tokenomicsService: ITokenomicsService,
+  db: BetterSQLite3Database<typeof schema>
 ) {
   mcp.registerTool(
     "stake-on-health-note",
@@ -39,7 +41,12 @@ export function registerStakeTokensTool(
         }
 
         // Stake tokens using tokenomics service
-        const stakeResult = await tokenomicsService.stakeTokens(noteId, userId, amount, position, reasoning);
+        const stakeResult = await tokenomicsService.stakeTokens({
+          noteId,
+          amount,
+          position,
+          reasoning
+        });
 
         // Record stake in database
         await db.insert(stakes).values({

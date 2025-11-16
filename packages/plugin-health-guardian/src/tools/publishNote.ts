@@ -1,9 +1,13 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { DkgContext } from "@dkg/plugins";
 import { eq } from "drizzle-orm";
-import { PublishNoteSchema } from "../types";
-import { DkgService } from "../services/dkgService";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { PublishNoteSchema, IDkgService } from "../types";
 import { communityNotes, healthClaims } from "../database";
+import * as schema from "../database/schema";
+import { createServiceLogger } from "../services/Logger";
+
+const logger = createServiceLogger("PublishNoteTool");
 
 /**
  * Publish Health Community Note MCP Tool
@@ -11,8 +15,8 @@ import { communityNotes, healthClaims } from "../database";
 export function registerPublishNoteTool(
   mcp: McpServer,
   ctx: DkgContext,
-  dkgService: DkgService,
-  db: any // TODO: Replace with proper database type
+  dkgService: IDkgService,
+  db: BetterSQLite3Database<typeof schema>
 ) {
   mcp.registerTool(
     "publish-health-note",
@@ -23,6 +27,8 @@ export function registerPublishNoteTool(
     },
     async ({ claimId, summary, confidence, verdict, sources }) => {
       try {
+        logger.info("Publishing health community note", { claimId, verdict, confidence });
+
         // Generate noteId first
         const noteId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -65,6 +71,8 @@ export function registerPublishNoteTool(
           .set({ status: "published", updatedAt: new Date() })
           .where(eq(healthClaims.claimId, claimId));
 
+        logger.info("Community note published successfully", { noteId, ual: result.UAL, claimId });
+
         return {
           content: [{
             type: "text",
@@ -73,10 +81,10 @@ export function registerPublishNoteTool(
           noteId,
           ual: result.UAL
         };
-      } catch (error) {
-        console.error("Publishing note failed:", error);
+      } catch (error: any) {
+        logger.error("Publishing note failed", { error: error.message, claimId });
         return {
-          content: [{ type: "text", text: "Failed to publish note. Please try again." }],
+          content: [{ type: "text", text: `Failed to publish note: ${error.message || "Please try again."}` }],
           isError: true
         };
       }

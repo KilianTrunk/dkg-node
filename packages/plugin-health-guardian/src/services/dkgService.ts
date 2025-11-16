@@ -1,10 +1,11 @@
 import { DKG_CONFIG } from "../config";
-import type { DkgPublishResult, DkgAsset } from "../types";
+import type { DkgPublishResult, DkgAsset, IDkgService } from "../types";
+import { dkgLogger } from "./Logger";
 
 /**
  * DKG Edge Node Service - Real DKG integration
  */
-export class DkgService {
+export class DkgService implements IDkgService {
   private dkgClient: any = null;
 
   async initialize(ctx?: any) {
@@ -12,10 +13,10 @@ export class DkgService {
     // Otherwise, this service is being used standalone
     if (ctx?.dkg) {
       this.dkgClient = ctx.dkg;
-      console.log("✅ DKG Service initialized with real DKG client from context");
+      dkgLogger.info("DKG Service initialized with real DKG client from context");
     } else {
       // Fallback for standalone usage (mock)
-      console.warn("⚠️  DKG Service initialized in mock mode - no DKG context provided");
+      dkgLogger.warn("DKG Service initialized in mock mode - no DKG context provided");
       this.dkgClient = {
         asset: {
           create: this.mockPublish.bind(this),
@@ -33,7 +34,7 @@ export class DkgService {
       throw new Error("DKG client not initialized");
     }
 
-    console.log("🚀 Publishing Knowledge Asset to DKG:", {
+    dkgLogger.info("Publishing Knowledge Asset to DKG", {
       contentPreview: JSON.stringify(content).substring(0, 200) + "...",
       privacy
     });
@@ -61,7 +62,7 @@ export class DkgService {
         throw new Error("DKG API returned success but no UAL was provided");
       }
 
-      console.log("✅ Knowledge Asset published successfully:", result.UAL);
+      dkgLogger.info("Knowledge Asset published successfully", { ual: result.UAL });
 
       return {
         UAL: result.UAL,
@@ -69,7 +70,7 @@ export class DkgService {
         blockNumber: result.blockNumber
       };
     } catch (error) {
-      console.error("❌ DKG publishing failed:", error);
+      dkgLogger.error("DKG publishing failed", { error });
       throw new Error(`DKG publishing failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -84,11 +85,11 @@ export class DkgService {
 
     // Skip mock UALs - these don't exist on real DKG
     if (ual.startsWith('did:dkg:demo:')) {
-      console.log("⚠️  Skipping mock UAL retrieval:", ual);
+      dkgLogger.warn("Skipping mock UAL retrieval", { ual });
       return null;
     }
 
-    console.log("📖 Retrieving Knowledge Asset from DKG:", ual);
+    dkgLogger.info("Retrieving Knowledge Asset from DKG", { ual });
 
     try {
       // Use real DKG Edge Node (following working pattern from dkg-publisher)
@@ -96,7 +97,7 @@ export class DkgService {
         includeMetadata: true
       });
 
-      console.log("✅ Knowledge Asset retrieved successfully");
+      dkgLogger.info("Knowledge Asset retrieved successfully");
 
       return {
         UAL: ual,
@@ -105,7 +106,7 @@ export class DkgService {
         timestamp: result.metadata?.timestamp
       };
     } catch (error) {
-      console.error("❌ DKG retrieval failed:", error);
+      dkgLogger.error("DKG retrieval failed", { error });
       return null;
     }
   }
@@ -119,7 +120,7 @@ export class DkgService {
       throw new Error("DKG client not initialized");
     }
 
-    console.log("🔍 Querying DKG for health assets:", sparqlQuery.substring(0, 100) + "...");
+    dkgLogger.info("Querying DKG for health assets", { queryPreview: sparqlQuery.substring(0, 100) + "..." });
 
     try {
       // Note: This would use the graph.query method if available
@@ -127,7 +128,7 @@ export class DkgService {
       const result = await this.dkgClient.graph?.query?.(sparqlQuery, "SELECT");
       return result;
     } catch (error) {
-      console.error("❌ DKG query failed:", error);
+      dkgLogger.error("DKG query failed", { error });
       return null;
     }
   }
@@ -142,7 +143,7 @@ export class DkgService {
 
     const mockUAL = `did:dkg:${DKG_CONFIG.blockchain.name}:health-asset:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
 
-    console.log("Mock DKG publish successful:", mockUAL);
+    dkgLogger.info("Mock DKG publish successful", { ual: mockUAL });
 
     return {
       UAL: mockUAL,
@@ -178,7 +179,7 @@ export class DkgService {
    */
   async executeSparqlQuery(query: string) {
     // TODO: Implement SPARQL query functionality
-    console.log("SPARQL query requested:", query.substring(0, 100) + "...");
+    dkgLogger.info("SPARQL query requested", { queryPreview: query.substring(0, 100) + "..." });
     return {
       success: false,
       error: "SPARQL queries not yet implemented"

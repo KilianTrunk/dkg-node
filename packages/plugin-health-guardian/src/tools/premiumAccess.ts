@@ -1,9 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { DkgContext } from "@dkg/plugins";
 import { sql } from "drizzle-orm";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { PremiumAccessSchema } from "../types";
-import { PaymentService } from "../services/paymentService";
+import { IPaymentService } from "../types";
 import { premiumAccess, communityNotes } from "../database";
+import * as schema from "../database/schema";
 
 /**
  * Premium Access MCP Tool
@@ -11,8 +13,8 @@ import { premiumAccess, communityNotes } from "../database";
 export function registerPremiumAccessTool(
   mcp: McpServer,
   ctx: DkgContext,
-  paymentService: PaymentService,
-  db: any // TODO: Replace with proper database type
+  paymentService: IPaymentService,
+  db: BetterSQLite3Database<typeof schema>
 ) {
   mcp.registerTool(
     "access-premium-health-insights",

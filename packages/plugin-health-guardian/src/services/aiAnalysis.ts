@@ -1,5 +1,5 @@
-import { AI_CONFIG } from "../config";
-import type { AnalysisResult } from "../types";
+import type { AnalysisResult, IAIAnalysisService } from "../types";
+import { aiLogger } from "./Logger";
 
 // LLM provider will be accessed dynamically at runtime
 // This avoids import issues while still using the agent's configured LLM
@@ -7,13 +7,13 @@ import type { AnalysisResult } from "../types";
 /**
  * AI-powered health claim analysis service using the agent's configured LLM
  */
-export class AIAnalysisService {
+export class AIAnalysisService implements IAIAnalysisService {
   private llm: any = null;
   private llmInitialized: boolean = false;
 
   async initializeAIClient() {
     // Lazy initialization - just mark that we should try to initialize later
-    console.log("🤖 AI Analysis Service registered for lazy LLM initialization");
+    aiLogger.info("AI Analysis Service registered for lazy LLM initialization");
   }
 
   private async ensureLLM() {
@@ -25,7 +25,7 @@ export class AIAnalysisService {
       if (globalLLM) {
         this.llm = globalLLM;
         this.llmInitialized = true;
-        console.log("✅ AI Analysis Service initialized with global LLM:", {
+        aiLogger.info("AI Analysis Service initialized with global LLM", {
           provider: this.llm?.constructor?.name || 'Unknown',
           model: this.llm?.model || 'Unknown',
           temperature: this.llm?.temperature || 'Unknown'
@@ -38,17 +38,17 @@ export class AIAnalysisService {
         const { llmProvider } = await import("../../../../apps/agent/src/shared/chat.js" as any);
         this.llm = await llmProvider();
         this.llmInitialized = true;
-        console.log("✅ AI Analysis Service initialized with imported LLM:", {
+        aiLogger.info("AI Analysis Service initialized with imported LLM", {
           provider: this.llm?.constructor?.name || 'Unknown',
           model: this.llm?.model || 'Unknown',
           temperature: this.llm?.temperature || 'Unknown'
         });
       } catch (importError) {
-        console.warn("Could not import LLM provider:", importError);
+        aiLogger.warn("Could not import LLM provider", { error: importError });
         throw new Error("LLM provider not available");
       }
     } catch (error) {
-      console.error("❌ Failed to initialize LLM:", error);
+      aiLogger.error("Failed to initialize LLM", { error });
       this.llmInitialized = true; // Don't try again
       throw error;
     }
@@ -60,7 +60,7 @@ export class AIAnalysisService {
       try {
         await this.ensureLLM();
       } catch (error) {
-        console.warn("LLM initialization failed, using mock analysis:", error);
+        aiLogger.warn("LLM initialization failed, using mock analysis", { error });
       }
     }
 
@@ -69,7 +69,7 @@ export class AIAnalysisService {
       try {
         return await this.performRealAnalysis(claim, context);
       } catch (error) {
-        console.warn("Real AI analysis failed, falling back to mock:", error);
+        aiLogger.warn("Real AI analysis failed, falling back to mock", { error });
       }
     }
 
@@ -132,7 +132,7 @@ Provide your analysis in the following JSON format:
         sources: parsed.sources
       };
     } catch (error) {
-      console.error("Failed to parse LLM response:", error);
+      aiLogger.error("Failed to parse LLM response", { error });
       throw new Error("Failed to analyze claim with AI");
     }
   }

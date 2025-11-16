@@ -1,8 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { DkgContext } from "@dkg/plugins";
-import { AnalyzeClaimSchema } from "../types";
-import { AIAnalysisService } from "../services/aiAnalysis";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { AnalyzeClaimSchema, IAIAnalysisService } from "../types";
 import { healthClaims } from "../database";
+import * as schema from "../database/schema";
+import { createServiceLogger } from "../services/Logger";
+
+const logger = createServiceLogger("AnalyzeClaimTool");
 
 /**
  * Analyze Health Claim MCP Tool
@@ -10,8 +14,8 @@ import { healthClaims } from "../database";
 export function registerAnalyzeClaimTool(
   mcp: McpServer,
   ctx: DkgContext,
-  aiService: AIAnalysisService,
-  db: any // TODO: Replace with proper database type
+  aiService: IAIAnalysisService,
+  db: BetterSQLite3Database<typeof schema>
 ) {
   mcp.registerTool(
     "analyze-health-claim",
@@ -22,6 +26,8 @@ export function registerAnalyzeClaimTool(
     },
     async ({ claim, context }) => {
       try {
+        logger.info("Analyzing health claim", { claimLength: claim.length, hasContext: !!context });
+
         const analysis = await aiService.analyzeHealthClaim(claim, context);
 
         // Store claim in database for tracking
@@ -34,6 +40,8 @@ export function registerAnalyzeClaimTool(
           updatedAt: new Date(),
         });
 
+        logger.info("Health claim analyzed and stored", { claimId, verdict: analysis.verdict });
+
         return {
           content: [{
             type: "text",
@@ -42,10 +50,10 @@ export function registerAnalyzeClaimTool(
           claimId,
           analysis
         };
-      } catch (error) {
-        console.error("Health claim analysis failed:", error);
+      } catch (error: any) {
+        logger.error("Health claim analysis failed", { error: error.message, claim: claim.substring(0, 100) + "..." });
         return {
-          content: [{ type: "text", text: "Analysis failed. Please try again." }],
+          content: [{ type: "text", text: `Analysis failed: ${error.message || "Please try again."}` }],
           isError: true
         };
       }

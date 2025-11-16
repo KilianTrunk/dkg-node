@@ -1,10 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { DkgContext } from "@dkg/plugins";
 import { eq } from "drizzle-orm";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { z } from "zod";
 import { GetNoteSchema } from "../types";
-import { DkgService } from "../services/dkgService";
+import { IDkgService } from "../types";
 import { communityNotes, stakes } from "../database";
+import * as schema from "../database/schema";
 
 /**
  * Get Health Community Note MCP Tool
@@ -12,8 +14,8 @@ import { communityNotes, stakes } from "../database";
 export function registerGetNoteTool(
   mcp: McpServer,
   ctx: DkgContext,
-  dkgService: DkgService,
-  db: any // TODO: Replace with proper database type
+  dkgService: IDkgService,
+  db: BetterSQLite3Database<typeof schema>
 ) {
   mcp.registerTool(
     "get-health-note",

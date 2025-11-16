@@ -1,13 +1,12 @@
 import { defineDkgPlugin } from "@dkg/plugins";
 import { openAPIRoute, z } from "@dkg/plugin-swagger";
 import { eq, desc, sql } from "drizzle-orm";
+import { config as dotenvConfig } from "dotenv";
+import path from "path";
+import { loadConfig, type HealthGuardianConfig } from "./config";
+import type { IAIAnalysisService, IDkgService, ITokenomicsService, IPaymentService, IMetricsService } from "./types";
+import { initializeServices, shutdownServices, ServiceContainer } from "./services";
 import { db, healthClaims, communityNotes, stakes, premiumAccess } from "./database";
-
-// Import services
-import { AIAnalysisService } from "./services/aiAnalysis";
-import { DkgService } from "./services/dkgService";
-import { TokenomicsService } from "./services/tokenomicsService";
-import { PaymentService } from "./services/paymentService";
 
 // Import tools
 import { registerAnalyzeClaimTool } from "./tools/analyzeClaim";
@@ -27,29 +26,61 @@ function parseSources(sourcesJson: string | null): string[] {
   }
 }
 
+// Services container for managing dependencies
+let serviceContainer: ServiceContainer | null = null;
+
+/**
+ * Health Guardian Plugin
+ *
+ * Enterprise-grade system for health claims verification and community-driven fact-checking
+ * Features:
+ * - AI-powered health claim analysis
+ * - Decentralized community notes with DKG publishing
+ * - Tokenomics-powered trust and staking system
+ * - Premium access with micropayments
+ */
 export default defineDkgPlugin((ctx, mcp, api) => {
+  const pluginInitTime = Date.now();
+  console.log(
+    `Health Guardian Plugin executing at ${new Date().toISOString()} (${pluginInitTime})`,
+  );
+
+  // Load configuration from package root .env file
+  const envPath = path.resolve(__dirname, "..", ".env.health-guardian");
+  console.log(`Loading Health Guardian config from: ${envPath}`);
+  dotenvConfig({ path: envPath });
+
+  console.log(`HG_DATABASE_PATH found: ${!!process.env.HG_DATABASE_PATH}`);
+
+  // Initialize services if configuration is provided
+  const config: HealthGuardianConfig = loadConfig();
+  console.log(`Initializing Health Guardian services... (${Date.now()})`);
+
   // Initialize services
-  const aiService = new AIAnalysisService();
-  const dkgService = new DkgService();
-  const tokenomicsService = new TokenomicsService();
-  const paymentService = new PaymentService();
+  initializeServices(config, ctx)
+    .then((container) => {
+      serviceContainer = container;
 
-  // Initialize all services - pass context to DKG service for real integration
-  Promise.all([
-    aiService.initializeAIClient(),
-    dkgService.initialize(ctx),
-    tokenomicsService.initialize(),
-    paymentService.initialize()
-  ]).catch(error => {
-    console.error("Failed to initialize services:", error);
-  });
+      console.log(`Health Guardian Plugin ready!`);
+      console.log(`   - Database: ${config.database.path}`);
+      console.log(`   - AI Provider: ${config.ai?.provider || 'Not configured'}`);
+      console.log(`   - DKG Endpoint: ${config.dkg?.endpoint || 'Not configured'}`);
 
-  // Register MCP tools using modular functions
-  registerAnalyzeClaimTool(mcp, ctx, aiService, db);
-  registerPublishNoteTool(mcp, ctx, dkgService, db);
-  registerGetNoteTool(mcp, ctx, dkgService, db);
-  registerStakeTokensTool(mcp, ctx, tokenomicsService, db);
-  registerPremiumAccessTool(mcp, ctx, paymentService, db);
+      // Register MCP tools using modular functions
+      const aiService = container.get<IAIAnalysisService>("aiService");
+      const dkgService = container.get<IDkgService>("dkgService");
+      const tokenomicsService = container.get<ITokenomicsService>("tokenomicsService");
+      const paymentService = container.get<IPaymentService>("paymentService");
+
+      registerAnalyzeClaimTool(mcp, ctx, aiService, db);
+      registerPublishNoteTool(mcp, ctx, dkgService, db);
+      registerGetNoteTool(mcp, ctx, dkgService, db);
+      registerStakeTokensTool(mcp, ctx, tokenomicsService, db);
+      registerPremiumAccessTool(mcp, ctx, paymentService, db);
+    })
+    .catch((error) => {
+      console.error("Health Guardian Plugin initialization failed:", error);
+    });
 
   // API Routes for web interface integration
 
@@ -74,6 +105,12 @@ export default defineDkgPlugin((ctx, mcp, api) => {
         },
       },
       async (req, res) => {
+        if (!serviceContainer) {
+          return res
+            .status(503)
+            .json({ error: "Health Guardian Plugin is starting up" });
+        }
+
         try {
           const { limit = 10, offset = 0 } = req.query;
           const claims = await db.select()
@@ -86,8 +123,9 @@ export default defineDkgPlugin((ctx, mcp, api) => {
           const total = totalResult[0]?.count || 0;
 
           res.json({ claims, total });
-        } catch (error) {
-          res.status(500).json({ error: "Failed to fetch claims" });
+        } catch (error: any) {
+          console.error("Failed to fetch health claims:", error);
+          res.status(500).json({ error: error.message || "Failed to fetch claims" });
         }
       },
     ),
@@ -113,6 +151,12 @@ export default defineDkgPlugin((ctx, mcp, api) => {
         },
       },
       async (req, res) => {
+        if (!serviceContainer) {
+          return res
+            .status(503)
+            .json({ error: "Health Guardian Plugin is starting up" });
+        }
+
         try {
           let notes;
           if (req.query.claimId) {
@@ -129,8 +173,9 @@ export default defineDkgPlugin((ctx, mcp, api) => {
           }
 
           res.json({ notes });
-        } catch (error) {
-          res.status(500).json({ error: "Failed to fetch notes" });
+        } catch (error: any) {
+          console.error("Failed to fetch community notes:", error);
+          res.status(500).json({ error: error.message || "Failed to fetch notes" });
         }
       },
     ),
@@ -159,6 +204,12 @@ export default defineDkgPlugin((ctx, mcp, api) => {
         },
       },
       async (req, res) => {
+        if (!serviceContainer) {
+          return res
+            .status(503)
+            .json({ error: "Health Guardian Plugin is starting up" });
+        }
+
         try {
           const stakeData = await db.select().from(stakes).where(eq(stakes.noteId, req.params.noteId));
 
@@ -169,10 +220,145 @@ export default defineDkgPlugin((ctx, mcp, api) => {
             stakes: stakeData,
             consensus: { support, oppose }
           });
-        } catch (error) {
-          res.status(500).json({ error: "Failed to fetch stakes" });
+        } catch (error: any) {
+          console.error("Failed to fetch stakes:", error);
+          res.status(500).json({ error: error.message || "Failed to fetch stakes" });
         }
       },
     ),
   );
+
+  // Health monitoring and metrics endpoints
+
+  // System health check
+  api.get("/health/status", async (_req, res) => {
+    if (!serviceContainer) {
+      return res.status(503).json({
+        status: "starting",
+        message: "Health Guardian Plugin is starting up"
+      });
+    }
+
+    try {
+      const metricsService = serviceContainer.get<IMetricsService>("metricsService");
+      const health = await metricsService.getSystemHealth();
+
+      res.json(health);
+    } catch (error: any) {
+      console.error("Health check failed:", error);
+      res.status(500).json({
+        status: "unhealthy",
+        error: error.message || "Health check failed"
+      });
+    }
+  });
+
+  // Detailed metrics endpoints
+  api.get("/health/metrics/claims", async (_req, res) => {
+    if (!serviceContainer) {
+      return res.status(503).json({ error: "Services not initialized" });
+    }
+
+    try {
+      const metricsService = serviceContainer.get<IMetricsService>("metricsService");
+      const metrics = await metricsService.getClaimsMetrics();
+      res.json(metrics);
+    } catch (error: any) {
+      console.error("Failed to get claims metrics:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  api.get("/health/metrics/notes", async (_req, res) => {
+    if (!serviceContainer) {
+      return res.status(503).json({ error: "Services not initialized" });
+    }
+
+    try {
+      const metricsService = serviceContainer.get<IMetricsService>("metricsService");
+      const metrics = await metricsService.getNotesMetrics();
+      res.json(metrics);
+    } catch (error: any) {
+      console.error("Failed to get notes metrics:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  api.get("/health/metrics/staking", async (_req, res) => {
+    if (!serviceContainer) {
+      return res.status(503).json({ error: "Services not initialized" });
+    }
+
+    try {
+      const metricsService = serviceContainer.get<IMetricsService>("metricsService");
+      const metrics = await metricsService.getStakingMetrics();
+      res.json(metrics);
+    } catch (error: any) {
+      console.error("Failed to get staking metrics:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  api.get("/health/metrics/premium", async (_req, res) => {
+    if (!serviceContainer) {
+      return res.status(503).json({ error: "Services not initialized" });
+    }
+
+    try {
+      const metricsService = serviceContainer.get<IMetricsService>("metricsService");
+      const metrics = await metricsService.getPremiumMetrics();
+      res.json(metrics);
+    } catch (error: any) {
+      console.error("Failed to get premium metrics:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Comprehensive metrics dashboard
+  api.get("/health/metrics", async (_req, res) => {
+    if (!serviceContainer) {
+      return res.status(503).json({ error: "Services not initialized" });
+    }
+
+    try {
+      const metricsService = serviceContainer.get<IMetricsService>("metricsService");
+      const health = await metricsService.getSystemHealth();
+      res.json(health);
+    } catch (error: any) {
+      console.error("Failed to get comprehensive metrics:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 });
+
+// Cleanup function
+const gracefulShutdown = async (signal: string) => {
+  console.log(`Received ${signal}, shutting down Health Guardian services...`);
+
+  if (serviceContainer) {
+    await shutdownServices(serviceContainer);
+    console.log("Health Guardian services shut down gracefully");
+  }
+
+  // Reset initialization state
+  serviceContainer = null;
+
+  process.exit(0);
+};
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+// Export types
+export type {
+  HealthGuardianConfig,
+} from "./config";
+export type {
+  HealthClaim,
+  AnalysisResult,
+  CommunityNote,
+  Stake,
+  StakeResult,
+  PremiumAccess,
+  ConsensusData,
+} from "./types";
