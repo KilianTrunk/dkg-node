@@ -19,6 +19,7 @@
     "@dkg/plugins": "^0.0.2",
     "@types/node": "^24.10.1",
     "better-sqlite3": "^11.3.0",
+    "dotenv": "^17.2.3",
     "drizzle-orm": "^0.36.0",
     "ethers": "^6.15.0",
     "winston": "^3.17.0",

@@ -1,5 +1,5 @@
-import { TOKEN_CONFIG } from "../config";
-import type { StakeResult } from "../types";
+import { getTokenConfig } from "../config";
+import type { StakeResult, StakeRequest } from "../types";
 import { ethers } from "ethers";
 import { BlockchainProvider } from "./blockchainProvider";
 import { TokenContractService } from "./tokenContractService";
@@ -24,13 +24,15 @@ export class TokenomicsService {
 
     // Initialize token contract service
     this.tokenService = new TokenContractService(this.blockchainProvider);
+    await this.tokenService.initialize();
 
     this.initialized = true;
 
+    const tokenConfig = getTokenConfig();
     console.log("✅ Tokenomics Service initialized with config:", {
-      tracContract: TOKEN_CONFIG.TRAC.contractAddress,
-      neuroContract: TOKEN_CONFIG.NEURO.contractAddress,
-      minimumStake: TOKEN_CONFIG.staking.minimumStake,
+      tracContract: tokenConfig.TRAC.contractAddress,
+      neuroContract: tokenConfig.NEURO.contractAddress,
+      minimumStake: tokenConfig.staking.minimumStake,
       network: this.blockchainProvider.getNetworkName()
     });
   }
@@ -39,17 +41,15 @@ export class TokenomicsService {
    * Stake TRAC tokens on a health note
    * Creates a real token transfer to a staking pool
    */
-  async stakeTokens(
-    noteId: string,
-    userId: string,
-    amount: number,
-    position: "support" | "oppose",
-    reasoning?: string
-  ): Promise<StakeResult> {
+  async stakeTokens(request: StakeRequest): Promise<StakeResult> {
     await this.initialize();
 
-    if (amount < TOKEN_CONFIG.staking.minimumStake) {
-      throw new Error(`Minimum stake is ${TOKEN_CONFIG.staking.minimumStake} TRAC tokens`);
+    const { noteId, amount, position, reasoning } = request;
+    const userId = "demo_user"; // Mock user ID for now
+
+    const tokenConfig = getTokenConfig();
+    if (amount < tokenConfig.staking.minimumStake) {
+      throw new Error(`Minimum stake is ${tokenConfig.staking.minimumStake} TRAC tokens`);
     }
 
     if (!this.tokenService.hasTracContract()) {
