@@ -169,13 +169,83 @@ export class DkgService implements IDkgService {
   }
 
   /**
-   * Mock SPARQL query for development
+   * Execute arbitrary SPARQL against DKG
    */
-  async executeSparqlQuery(query: string) {
-    dkgLogger.info("SPARQL query requested", { queryPreview: query.substring(0, 100) + "..." });
-    return {
-      success: false,
-      error: "SPARQL queries not yet implemented"
-    };
+  async executeSparqlQuery(query: string, options?: { paranetUAL?: string }) {
+    if (!this.dkgClient?.graph?.query) {
+      throw new Error("DKG client not initialized for SPARQL queries");
+    }
+
+    dkgLogger.info("SPARQL query requested", {
+      queryPreview: query.substring(0, 120) + "...",
+      paranetUAL: options?.paranetUAL,
+    });
+
+    return this.dkgClient.graph.query(query, "SELECT", options?.paranetUAL ? { paranetUAL: options.paranetUAL } : undefined);
+  }
+
+  async querySocialGraph(params: {
+    keyword: string;
+    publisherKey?: string;
+    limit?: number;
+    paranetUAL?: string;
+  }): Promise<{ query: string; paranetUAL?: string; count: number; data: any[] }> {
+    if (!this.dkgClient?.graph?.query) {
+      throw new Error("DKG client not initialized");
+    }
+
+    const limit = Math.min(Math.max(params.limit ?? 10, 1), 50);
+    const keyword = (params.keyword || "").replace(/\"/g, '\\"');
+    const publisherFilter = params.publisherKey
+      ? `FILTER(BOUND(?publishedBy) && ?publishedBy = "${params.publisherKey}")`
+      : "";
+
+    const sparql = `
+PREFIX schema: <http://schema.org/>
+PREFIX dkg: <https://ontology.origintrail.io/dkg/1.0#>
+
+SELECT DISTINCT ?graph ?post ?headline ?body ?aboutName ?keywordName ?author ?publisher ?publishedBy ?publishTime
+WHERE {
+  GRAPH <current:graph> { ?kc dkg:hasNamedGraph ?graph . }
+  GRAPH ?graph {
+    ?post a <http://schema.org/SocialMediaPosting> .
+    OPTIONAL { ?post <http://schema.org/headline> ?headline . }
+    OPTIONAL { ?post <http://schema.org/articleBody> ?body . }
+    OPTIONAL { ?post <http://schema.org/about> ?about . ?about <http://schema.org/name> ?aboutName . }
+    OPTIONAL { ?post <http://schema.org/keywords> ?kw . ?kw <http://schema.org/name> ?keywordName . }
+    OPTIONAL { ?post <http://schema.org/author> ?author . }
+    OPTIONAL { ?post <http://schema.org/publisher> ?publisher . }
+    FILTER(
+      CONTAINS(LCASE(COALESCE(?headline, "")), LCASE("${keyword}")) ||
+      CONTAINS(LCASE(COALESCE(?body, "")), LCASE("${keyword}")) ||
+      (BOUND(?aboutName) && CONTAINS(LCASE(?aboutName), LCASE("${keyword}"))) ||
+      (BOUND(?keywordName) && CONTAINS(LCASE(?keywordName), LCASE("${keyword}")))
+    )
+  }
+  OPTIONAL {
+    GRAPH <metadata:graph> {
+      ?kc dkg:hasNamedGraph ?graph .
+      OPTIONAL { ?kc dkg:publishedBy ?publishedBy . }
+      OPTIONAL { ?kc dkg:publishTime ?publishTime . }
+    }
+  }
+  ${publisherFilter}
+}
+LIMIT ${limit}
+    `.trim();
+
+    dkgLogger.info("Querying DKG social graph", {
+      keyword: params.keyword,
+      limit,
+      paranetUAL: params.paranetUAL,
+    });
+
+    const data = await this.dkgClient.graph.query(
+      sparql,
+      "SELECT",
+      params.paranetUAL ? { paranetUAL: params.paranetUAL } : undefined,
+    );
+
+    return { query: sparql, paranetUAL: params.paranetUAL, count: Array.isArray(data) ? data.length : 0, data: data || [] };
   }
 }

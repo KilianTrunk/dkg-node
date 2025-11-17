@@ -2,6 +2,7 @@ import { defineDkgPlugin } from "@dkg/plugins";
 import { openAPIRoute, z } from "@dkg/plugin-swagger";
 import { eq, desc, sql } from "drizzle-orm";
 import { config as dotenvConfig } from "dotenv";
+import fs from "fs";
 import path from "path";
 import { loadConfig, type HealthGuardianConfig } from "./config";
 import type { IAIAnalysisService, IDkgService, ITokenomicsService, IPaymentService, IMetricsService } from "./types";
@@ -9,11 +10,13 @@ import { initializeServices, shutdownServices, ServiceContainer } from "./servic
 import { db, healthClaims, communityNotes, stakes, premiumAccess } from "./database";
 
 // Import tools
-import { registerAnalyzeClaimTool } from "./tools/analyzeClaim";
 import { registerPublishNoteTool } from "./tools/publishNote";
 import { registerGetNoteTool } from "./tools/getNote";
 import { registerStakeTokensTool } from "./tools/stakeTokens";
 import { registerPremiumAccessTool } from "./tools/premiumAccess";
+import { registerGetPremiumSourcesTool } from "./tools/getPremiumSources";
+import { registerSocialGraphTool } from "./tools/socialGraph";
+import { registerAnalyzeClaimTool } from "./tools/analyzeClaim";
 
 // Helper function to safely parse sources JSON
 function parseSources(sourcesJson: string | null): string[] {
@@ -50,8 +53,6 @@ export default defineDkgPlugin((ctx, mcp, api) => {
   console.log(`Loading Health Guardian config from: ${envPath}`);
   dotenvConfig({ path: envPath });
 
-  console.log(`HG_DATABASE_PATH found: ${!!process.env.HG_DATABASE_PATH}`);
-
   // Initialize services if configuration is provided
   const config: HealthGuardianConfig = loadConfig();
   console.log(`Initializing Health Guardian services... (${Date.now()})`);
@@ -77,6 +78,8 @@ export default defineDkgPlugin((ctx, mcp, api) => {
       registerGetNoteTool(mcp, ctx, dkgService, db);
       registerStakeTokensTool(mcp, ctx, tokenomicsService, db);
       registerPremiumAccessTool(mcp, ctx, paymentService, db);
+      registerGetPremiumSourcesTool(mcp, ctx);
+      registerSocialGraphTool(mcp, ctx, dkgService);
     })
     .catch((error) => {
       console.error("Health Guardian Plugin initialization failed:", error);
