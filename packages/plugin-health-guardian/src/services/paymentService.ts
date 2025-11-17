@@ -1,4 +1,4 @@
-import { PAYMENT_CONFIG } from "../config";
+import { getPaymentConfig } from "../config";
 import { ethers } from "ethers";
 import { BlockchainProvider } from "./blockchainProvider";
 
@@ -21,9 +21,10 @@ export class PaymentService {
 
     this.initialized = true;
 
+    const paymentConfig = getPaymentConfig();
     console.log("✅ x402 Payment Service initialized with config:", {
-      stablecoin: PAYMENT_CONFIG.stablecoinAddress,
-      threshold: PAYMENT_CONFIG.micropaymentThreshold,
+      stablecoin: paymentConfig.stablecoinAddress,
+      threshold: paymentConfig.micropaymentThreshold,
       network: this.blockchainProvider.getNetworkName()
     });
   }
@@ -39,8 +40,9 @@ export class PaymentService {
   ): Promise<{ paymentUrl: string; paymentId: string; paymentHeaders: Record<string, string> }> {
     await this.initialize();
 
-    if (amount < PAYMENT_CONFIG.micropaymentThreshold) {
-      throw new Error(`Payment amount must be at least ${PAYMENT_CONFIG.micropaymentThreshold}`);
+    const paymentConfig = getPaymentConfig();
+    if (amount < paymentConfig.micropaymentThreshold) {
+      throw new Error(`Payment amount must be at least ${paymentConfig.micropaymentThreshold}`);
     }
 
     console.log("💳 Requesting x402 premium access payment:", {

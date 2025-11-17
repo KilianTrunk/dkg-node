@@ -156,21 +156,37 @@ export const DKG_CONFIG = {
   }
 };
 
-export const TOKEN_CONFIG = {
-  TRAC: {
-    contractAddress: process.env.HG_TRAC_TOKEN_ADDRESS || "0x0000000000000000000000000000000000000000"
-  },
-  NEURO: {
-    contractAddress: process.env.HG_NEURO_TOKEN_ADDRESS || "0x0000000000000000000000000000000000000000"
-  },
-  staking: {
-    minimumStake: parseFloat(process.env.HG_MINIMUM_STAKE || "1.0")
-  },
-  rewardMultiplier: parseFloat(process.env.HG_REWARD_MULTIPLIER || "1.0")
-};
+/**
+ * Dynamic TOKEN_CONFIG - loads values at runtime after env vars are set
+ */
+export function getTokenConfig() {
+  return {
+    TRAC: {
+      contractAddress: process.env.HG_TRAC_TOKEN_ADDRESS || "0x0000000000000000000000000000000000000000",
+      decimals: 18 // TRAC uses 18 decimals like most ERC20 tokens
+    },
+    NEURO: {
+      contractAddress: process.env.HG_NEURO_TOKEN_ADDRESS || "0x0000000000000000000000000000000000000000",
+      decimals: 18 // NEURO uses 18 decimals like most ERC20 tokens
+    },
+    staking: {
+      minimumStake: parseFloat(process.env.HG_MINIMUM_STAKE || "1.0")
+    },
+    rewardMultiplier: parseFloat(process.env.HG_REWARD_MULTIPLIER || "1.0")
+  };
+}
 
-export const PAYMENT_CONFIG = {
-  enabled: process.env.HG_PAYMENT_ENABLED === "true",
-  stablecoinAddress: process.env.HG_STABLECOIN_ADDRESS,
-  micropaymentThreshold: parseFloat(process.env.HG_MICROPAYMENT_THRESHOLD || "0.01")
-};
+/**
+ * Dynamic PAYMENT_CONFIG - loads values at runtime after env vars are set
+ */
+export function getPaymentConfig() {
+  return {
+    enabled: process.env.HG_PAYMENT_ENABLED === "true",
+    stablecoinAddress: process.env.HG_STABLECOIN_ADDRESS,
+    micropaymentThreshold: parseFloat(process.env.HG_MICROPAYMENT_THRESHOLD || "0.01")
+  };
+}
+
+// Legacy exports for backward compatibility (will be updated to use dynamic versions)
+export const TOKEN_CONFIG = getTokenConfig();
+export const PAYMENT_CONFIG = getPaymentConfig();
