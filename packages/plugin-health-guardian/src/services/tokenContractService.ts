@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { TOKEN_CONFIG } from "../config";
+import { getTokenConfig } from "../config";
 import { BlockchainProvider } from "./blockchainProvider";
 
 /**
@@ -51,25 +51,26 @@ export class TokenContractService {
     if (this.initialized) return;
 
     const signer = this.blockchainProvider.getSigner();
+    const tokenConfig = getTokenConfig();
 
     // Initialize TRAC contract
-    if (TOKEN_CONFIG.TRAC.contractAddress && TOKEN_CONFIG.TRAC.contractAddress !== "0x123...") {
+    if (tokenConfig.TRAC.contractAddress && tokenConfig.TRAC.contractAddress !== "0x0000000000000000000000000000000000000000") {
       this.tracContract = new ethers.Contract(
-        TOKEN_CONFIG.TRAC.contractAddress,
+        tokenConfig.TRAC.contractAddress,
         ERC20_ABI,
         signer
       );
-      console.log("🪙 TRAC contract initialized:", TOKEN_CONFIG.TRAC.contractAddress);
+      console.log("🪙 TRAC contract initialized:", tokenConfig.TRAC.contractAddress);
     }
 
     // Initialize NEURO contract
-    if (TOKEN_CONFIG.NEURO.contractAddress && TOKEN_CONFIG.NEURO.contractAddress !== "0x456...") {
+    if (tokenConfig.NEURO.contractAddress && tokenConfig.NEURO.contractAddress !== "0x0000000000000000000000000000000000000000") {
       this.neuroContract = new ethers.Contract(
-        TOKEN_CONFIG.NEURO.contractAddress,
+        tokenConfig.NEURO.contractAddress,
         ERC20_ABI,
         signer
       );
-      console.log("🧠 NEURO contract initialized:", TOKEN_CONFIG.NEURO.contractAddress);
+      console.log("🧠 NEURO contract initialized:", tokenConfig.NEURO.contractAddress);
     }
 
     this.initialized = true;
@@ -77,10 +78,22 @@ export class TokenContractService {
 
   /**
    * Get TRAC token balance for an address
+   * Handles both ERC-20 and native asset scenarios
    */
   async getTracBalance(address: string): Promise<bigint> {
-    const contract = this.getTracContract();
-    return await contract.balanceOf!(address);
+    const network = await this.blockchainProvider.getProvider().getNetwork();
+
+    // Neuroweb testnet chain ID is 20430, mainnet is 2043
+    if (network.chainId === 20430n || network.chainId === 2043n) {
+      // On Neuroweb, TRAC is an ERC-20 token, not native
+      console.log('🔄 Neuroweb detected: Using ERC-20 TRAC balance');
+      const contract = this.getTracContract();
+      return await contract.balanceOf!(address);
+    } else {
+      // Use ERC-20 contract balance for other networks
+      const contract = this.getTracContract();
+      return await contract.balanceOf!(address);
+    }
   }
 
   /**
@@ -93,17 +106,34 @@ export class TokenContractService {
 
   /**
    * Transfer TRAC tokens
+   * Uses ERC-20 transfers for Neuroweb (TRAC is ERC-20, not native)
    */
   async transferTrac(to: string, amount: bigint): Promise<ethers.TransactionResponse> {
-    const contract = this.getTracContract();
+    const network = await this.blockchainProvider.getProvider().getNetwork();
+    const tokenConfig = getTokenConfig();
 
-    console.log(`💸 Transferring ${ethers.formatUnits(amount, TOKEN_CONFIG.TRAC.decimals)} TRAC to ${to}`);
+    console.log(`💸 Transferring ${ethers.formatUnits(amount, tokenConfig.TRAC.decimals)} TRAC to ${to}`);
 
-    const tx = await contract.transfer!(to, amount);
-    await tx.wait();
+    // Neuroweb testnet (20430) and mainnet (2043) both use ERC-20 TRAC
+    if (network.chainId === 20430n || network.chainId === 2043n) {
+      console.log('🔄 Neuroweb detected: Using ERC-20 TRAC transfer');
+      const contract = this.getTracContract();
+      const signer = this.blockchainProvider.getSigner();
+      const tx = await contract.connect(signer).transfer(to, amount);
 
-    console.log("✅ TRAC transfer completed:", tx.hash);
-    return tx;
+      await tx.wait();
+      console.log("✅ TRAC transfer completed:", tx.hash);
+      return tx;
+    } else {
+      // Use ERC-20 contract transfer for other networks
+      const contract = this.getTracContract();
+      const signer = this.blockchainProvider.getSigner();
+      const tx = await contract.connect(signer).transfer(to, amount);
+
+      await tx.wait();
+      console.log("✅ TRAC transfer completed:", tx.hash);
+      return tx;
+    }
   }
 
   /**
@@ -112,7 +142,8 @@ export class TokenContractService {
   async transferNeuro(to: string, amount: bigint): Promise<ethers.TransactionResponse> {
     const contract = this.getNeuroContract();
 
-    console.log(`💸 Transferring ${ethers.formatUnits(amount, TOKEN_CONFIG.NEURO.decimals)} NEURO to ${to}`);
+    const tokenConfig = getTokenConfig();
+    console.log(`💸 Transferring ${ethers.formatUnits(amount, tokenConfig.NEURO.decimals)} NEURO to ${to}`);
 
     const tx = await contract.transfer!(to, amount);
     await tx.wait();
@@ -129,7 +160,8 @@ export class TokenContractService {
       const contract = this.getTracContract();
       return await contract.decimals!();
     } catch {
-      return TOKEN_CONFIG.TRAC.decimals; // fallback
+      const tokenConfig = getTokenConfig();
+      return tokenConfig.TRAC.decimals; // fallback
     }
   }
 
@@ -138,7 +170,8 @@ export class TokenContractService {
       const contract = this.getNeuroContract();
       return await contract.decimals!();
     } catch {
-      return TOKEN_CONFIG.NEURO.decimals; // fallback
+      const tokenConfig = getTokenConfig();
+      return tokenConfig.NEURO.decimals; // fallback
     }
   }
 
@@ -146,22 +179,26 @@ export class TokenContractService {
    * Format token amount for display
    */
   formatTracAmount(amount: bigint): string {
-    return ethers.formatUnits(amount, TOKEN_CONFIG.TRAC.decimals);
+    const tokenConfig = getTokenConfig();
+    return ethers.formatUnits(amount, tokenConfig.TRAC.decimals);
   }
 
   formatNeuroAmount(amount: bigint): string {
-    return ethers.formatUnits(amount, TOKEN_CONFIG.NEURO.decimals);
+    const tokenConfig = getTokenConfig();
+    return ethers.formatUnits(amount, tokenConfig.NEURO.decimals);
   }
 
   /**
    * Parse token amount from display format
    */
   parseTracAmount(amount: string): bigint {
-    return ethers.parseUnits(amount, TOKEN_CONFIG.TRAC.decimals);
+    const tokenConfig = getTokenConfig();
+    return ethers.parseUnits(amount, tokenConfig.TRAC.decimals);
   }
 
   parseNeuroAmount(amount: string): bigint {
-    return ethers.parseUnits(amount, TOKEN_CONFIG.NEURO.decimals);
+    const tokenConfig = getTokenConfig();
+    return ethers.parseUnits(amount, tokenConfig.NEURO.decimals);
   }
 
   /**
