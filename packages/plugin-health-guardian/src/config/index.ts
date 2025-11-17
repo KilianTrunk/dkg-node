@@ -161,7 +161,8 @@ export const TOKEN_CONFIG = {
     contractAddress: process.env.HG_TRAC_TOKEN_ADDRESS || "0x0000000000000000000000000000000000000000"
   },
   NEURO: {
-    contractAddress: process.env.HG_NEURO_TOKEN_ADDRESS || "0x0000000000000000000000000000000000000000"
+    contractAddress: process.env.HG_NEURO_TOKEN_ADDRESS || "0x0000000000000000000000000000000000000000",
+    decimals: parseInt(process.env.HG_NEURO_DECIMALS || "18")
   },
   staking: {
     minimumStake: parseFloat(process.env.HG_MINIMUM_STAKE || "1.0")
