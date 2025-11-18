@@ -32,7 +32,7 @@ HealthGuardianPlugin
 ├── AIAnalysisService (LLM Integration)
 ├── DkgService (DKG Publishing)
 ├── TokenomicsService (Staking)
-├── X402PaymentService (Premium Access)
+├── PaymentService (Premium Access)
 ├── MetricsService (Health Monitoring)
 └── Logger (Winston-based)
 ```
@@ -247,7 +247,7 @@ src/
 │   ├── aiAnalysis.ts    # LLM integration
 │   ├── dkgService.ts    # DKG publishing
 │   ├── tokenomicsService.ts  # Staking logic
-│   ├── x402PaymentService.ts # Premium access
+│   ├── paymentService.ts     # Premium access
 │   ├── metricsService.ts     # Health monitoring
 │   └── Logger.ts             # Winston logging
 ├── tools/           # MCP tool implementations
