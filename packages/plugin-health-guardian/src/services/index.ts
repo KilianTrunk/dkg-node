@@ -3,7 +3,7 @@ import { db } from "../database";
 import { AIAnalysisService } from "./aiAnalysis";
 import { DkgService } from "./dkgService";
 import { TokenomicsService } from "./tokenomicsService";
-import { X402PaymentService } from "./x402PaymentService";
+import { PaymentService } from "./paymentService";
 import { MetricsService } from "./MetricsService";
 import type { HealthGuardianConfig } from "../config";
 
@@ -35,7 +35,7 @@ export async function initializeServices(
   container.register("tokenomicsService", tokenomicsService);
 
   // Initialize Payment Service
-  const paymentService = new X402PaymentService();
+  const paymentService = new PaymentService();
   container.register("paymentService", paymentService);
 
   // Initialize Metrics Service
@@ -85,5 +85,5 @@ export { ServiceContainer } from "./ServiceContainer";
 export { AIAnalysisService } from "./aiAnalysis";
 export { DkgService } from "./dkgService";
 export { TokenomicsService } from "./tokenomicsService";
-export { X402PaymentService } from "./x402PaymentService";
+export { PaymentService } from "./paymentService";
 export { MetricsService } from "./MetricsService";

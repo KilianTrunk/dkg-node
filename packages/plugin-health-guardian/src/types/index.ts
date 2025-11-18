@@ -84,6 +84,12 @@ export interface PremiumAccessRequest {
   paymentAmount: number;
 }
 
+// MCP Tool schemas
+export const AnalyzeClaimSchema = z.object({
+  claim: z.string().describe("The health claim to analyze"),
+  context: z.string().optional().describe("Additional context about the claim")
+});
+
 export const PublishNoteSchema = z.object({
   claimId: z.string().describe("ID of the analyzed claim"),
   summary: z.string().describe("AI-generated summary"),
@@ -108,18 +114,6 @@ export const StakeSchema = z.object({
 export const PremiumAccessSchema = z.object({
   noteId: z.string().describe("ID of the community note"),
   paymentAmount: z.number().min(0.01).describe("Payment amount for premium access")
-});
-
-export const SocialGraphQuerySchema = z.object({
-  keyword: z.string().min(1).describe("Keyword to match in headline, body, tags, or about fields"),
-  publisherKey: z.string().optional().describe("Optional publisher key to focus on a specific issuer"),
-  paranetUAL: z.string().optional().describe("Optional paranet UAL to scope the query"),
-  limit: z.number().int().min(1).max(50).optional().describe("Result limit (1-50, default 10)")
-});
-
-export const AnalyzeClaimSchema = z.object({
-  claim: z.string().describe("The health claim to analyze"),
-  context: z.string().optional().describe("Additional context about the claim")
 });
 
 // API response types
@@ -193,23 +187,17 @@ export interface SystemHealthResponse {
 }
 
 // Service interfaces for better type safety
+export interface IAIAnalysisService {
+  initializeAIClient(): Promise<void>;
+  analyzeHealthClaim(claim: string, context?: string): Promise<AnalysisResult>;
+}
+
 export interface IDkgService {
   initialize(ctx?: any): Promise<void>;
   publishKnowledgeAsset(content: any, privacy?: "private" | "public"): Promise<DkgPublishResult>;
   getKnowledgeAsset(ual: string): Promise<DkgAsset | null>;
   queryHealthAssets(sparqlQuery: string): Promise<any>;
-  executeSparqlQuery(query: string, options?: { paranetUAL?: string }): Promise<any>;
-  querySocialGraph(params: {
-    keyword: string;
-    publisherKey?: string;
-    limit?: number;
-    paranetUAL?: string;
-  }): Promise<{ query: string; paranetUAL?: string; count: number; data: any[] }>;
-}
-
-export interface IAIAnalysisService {
-  initializeAIClient(): Promise<void>;
-  analyzeHealthClaim(claim: string, context?: string): Promise<AnalysisResult>;
+  executeSparqlQuery(query: string): Promise<any>;
 }
 
 export interface ITokenomicsService {

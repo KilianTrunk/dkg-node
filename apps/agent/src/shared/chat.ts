@@ -159,80 +159,6 @@ export const processCompletionRequest = async (req: Request) => {
       tools: body.tools,
     },
   );
-
-  const parseToolArgs = (tc: any) => {
-    if (tc.args && Object.keys(tc.args).length) return tc.args;
-    try {
-      return tc.function?.arguments ? JSON.parse(tc.function.arguments || "{}") : {};
-    } catch {
-      return {};
-    }
-  };
-
-  if (res.tool_calls && res.tool_calls.length) {
-    const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
-    const lastText = lastUser
-      ? toContents(lastUser.content).find((c: any) => c.type === "text")?.text?.trim()
-      : undefined;
-
-    res.tool_calls = res.tool_calls.map((tc) => {
-      const parsedArgs = parseToolArgs(tc);
-      const needsQuery =
-        tc.name === "get_medical_sources" || tc.name === "purchase_premium_medical_sources";
-      const missingQuery =
-        !parsedArgs || typeof (parsedArgs as any).query !== "string" || !(parsedArgs as any).query.trim?.();
-
-      if (needsQuery && missingQuery) {
-        const filledQuery = lastText || (parsedArgs as any)?.query;
-        return {
-          ...tc,
-          args: { ...(parsedArgs || {}), ...(filledQuery ? { query: filledQuery } : {}) },
-        };
-      }
-
-      return { ...tc, args: parsedArgs };
-    });
-  }
-
-  // if no tool call was produced but the user clearly asked for sources, synthesize it
-  if (!res.tool_calls || res.tool_calls.length === 0) {
-    const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
-    const lastText = lastUser
-      ? toContents(lastUser.content).find((c: any) => c.type === "text")?.text?.trim()
-      : undefined;
-    const match =
-      lastText?.match(/sources:\s*\"?([^"]+)\"?/i) ||
-      lastText?.match(/get medical sources for:\s*\"?([^"]+)\"?/i);
-    if (match && match[1]) {
-      res.tool_calls = [
-        {
-          id: `auto-premium-${Date.now()}`,
-          name: "purchase_premium_medical_sources",
-          args: { query: match[1].trim() },
-          type: "function",
-        },
-      ];
-      res.content = [];
-    }
-  }
-
-  // add a follow-up asking if the user wants sources or to publish
-  if (!res.tool_calls || res.tool_calls.length === 0) {
-    const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
-    const lastText = lastUser
-      ? toContents(lastUser.content).find((c: any) => c.type === "text")?.text?.trim()
-      : undefined;
-    const topicHint = lastText ? ` for "${lastText}"` : "";
-    const followUp = {
-      type: "text" as const,
-      text:
-        `Want sources${topicHint}? Say: sources: "${lastText || "<your topic>"}" (premium will auto-pay if confirmed). ` +
-        `Want me to publish this answer to DKG? Say: "yes, publish it."`,
-    };
-    const existing = toContents(res.content);
-    res.content = [...existing, followUp];
-  }
-
   return Response.json({
     role: "assistant",
     content: res.content,
@@ -266,19 +192,13 @@ export const makeCompletionRequest = async (
 
 export const DEFAULT_SYSTEM_PROMPT = `
 You are a DKG Agent that helps users interact with the OriginTrail Decentralized Knowledge Graph (DKG) using available Model Context Protocol (MCP) tools.
-Your role is to help users create, retrieve, and analyze verifiable knowledge in a friendly, approachable, and knowledgeable way, making the technology accessible to both experts and non-experts. Follow the numbered medical flow strictly.
+Your role is to help users create, retrieve, and analyze verifiable knowledge in a friendly, approachable, and knowledgeable way, making the technology accessible to both experts and non-experts.
 
 ## Core Responsibilities
 - Answer Questions: Retrieve and explain knowledge from the DKG to help users understand and solve problems.
 - Create Knowledge Assets: Assist users in publishing new knowledge assets to the DKG using MCP tools.
 - Perform Analyses: Use DKG data and MCP tools to perform structured analyses, presenting results clearly.
 - Be Helpful and Approachable: Communicate in simple, user-friendly terms. Use analogies and clear explanations where needed, but avoid unnecessary technical jargon unless requested.
-
-## Medical Sources (x402) Tooling (explicit triggers)
-- Step 1: Only run analyze-health-claim when the user writes analyze: "<claim". Do not trigger analyze-health-claim for generic "get sources" requests.
-- Step 2: When the user writes sources: "<query" or get medical sources for: "<query", auto-run purchase_premium_medical_sources with 0.02 NEURO (auto-pay), fetch 2 premium Europe PMC sources with links, publish one aggregated DKG note, and return the UAL and tx hash. If payment/verification fails, do NOT provide premium content—tell the user the payment failed and ask for a valid tx hash.
-- Step 4: After delivering the premium answer, ask if they want it published as a community note; if yes, use publish-health-note with the premium content.
-- For already-published items, use query_dkg_medical_sources with their query (and optional tier).
 
 ## Privacy Rule (IMPORTANT)
 When creating or publishing knowledge assets:
