@@ -39,16 +39,32 @@ export function registerPremiumAccessTool(
           };
         }
 
-        // Request payment
-        const paymentRequest = await paymentService.requestPremiumAccess(userId, noteId, paymentAmount);
+        // Process TRAC payment immediately (like staking)
+        const paymentResult = await paymentService.processPremiumAccess(userId, noteId, paymentAmount);
+
+        // Record premium access in database
+        await db.insert(premiumAccess).values({
+          userId,
+          noteId,
+          paymentAmount,
+          grantedAt: paymentResult.grantedAt,
+          expiresAt: paymentResult.expiresAt
+        });
+
+        // Generate transaction URL for tracking
+        const network = process.env.DKG_BLOCKCHAIN?.includes('20430') ? 'neuroweb-testnet' : 'neuroweb';
+        const baseUrl = `https://${network}.subscan.io`;
+        const txUrl = `${baseUrl}/tx/${paymentResult.transactionHash}`;
 
         return {
           content: [{
             type: "text",
-            text: `Premium access requested for ${paymentAmount} USD.\n\nPayment URL: ${paymentRequest.paymentUrl}\nPayment ID: ${paymentRequest.paymentId}\n\nComplete the payment to unlock:\n- Detailed analysis methodology\n- Expert reviewer comments\n- Related medical studies\n- Confidence interval data\n- Bias assessment\n\nAccess valid for 24 hours after payment.`
+            text: `✅ Premium access granted for ${paymentAmount} TRAC!\n\n🔗 [View Transaction](${txUrl})\n\nYou now have access to:\n- Enhanced analysis methodology\n- Expert medical commentary\n- Related medical studies & citations\n- Statistical confidence intervals\n- Source credibility assessment\n- Bias analysis & limitations\n\nAccess valid until: ${paymentResult.expiresAt.toISOString()}`
           }],
-          paymentUrl: paymentRequest.paymentUrl,
-          paymentId: paymentRequest.paymentId
+          transactionHash: paymentResult.transactionHash,
+          grantedAt: paymentResult.grantedAt,
+          expiresAt: paymentResult.expiresAt,
+          explorerLink: txUrl
         };
       } catch (error) {
         console.error("Premium access request failed:", error);

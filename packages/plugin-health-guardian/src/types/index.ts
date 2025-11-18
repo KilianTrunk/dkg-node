@@ -101,7 +101,8 @@ export const PublishNoteSchema = z.object({
 export const GetNoteSchema = z.object({
   noteId: z.string().optional().describe("Note ID from our database"),
   ual: z.string().optional().describe("DKG UAL of the note"),
-  claimId: z.string().optional().describe("Claim ID to find associated notes")
+  claimId: z.string().optional().describe("Claim ID to find associated notes"),
+  userId: z.string().optional().describe("User ID to check for premium access")
 });
 
 export const StakeSchema = z.object({
@@ -204,12 +205,25 @@ export interface ITokenomicsService {
   initialize(): Promise<void>;
   stakeTokens(request: StakeRequest): Promise<StakeResult>;
   getStakeConsensus(noteId: string): Promise<ConsensusData>;
+  calculateRewards(noteId: string, finalVerdict: string): Promise<{
+    totalRewards: number;
+    individualRewards: Array<{
+      agentId: string;
+      amount: number;
+      accuracy: number;
+      verdict: string;
+      transactionHash?: string;
+      reason: string;
+    }>;
+    finalVerdict: string;
+    consensusAccuracy: number;
+  }>;
 }
 
 export interface IPaymentService {
   initialize(): Promise<void>;
-  requestPremiumAccess(userId: string, noteId: string, amount: number): Promise<{ paymentUrl: string; paymentId: string; paymentHeaders: Record<string, string> }>;
-  processPremiumAccess(request: PremiumAccessRequest): Promise<PremiumAccess>;
+  processPremiumAccess(userId: string, noteId: string, amount: number): Promise<{ transactionHash: string; grantedAt: Date; expiresAt: Date }>;
+  requestPremiumAccess(userId: string, noteId: string, amount: number): Promise<{ paymentUrl: string; paymentId: string; paymentHeaders: Record<string, string> }>; // Legacy compatibility
 }
 
 export interface IMetricsService {

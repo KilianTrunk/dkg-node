@@ -3,6 +3,9 @@ import type { StakeResult, StakeRequest } from "../types";
 import { ethers } from "ethers";
 import { BlockchainProvider } from "./blockchainProvider";
 import { TokenContractService } from "./tokenContractService";
+import { agentRewards, healthClaims, stakes, communityNotes } from "../database/schema";
+import { db } from "../database";
+import { eq } from "drizzle-orm";
 
 /**
  * Tokenomics Service for TRAC/NEURO token staking
@@ -53,8 +56,7 @@ export class TokenomicsService {
     }
 
     if (!this.tokenService.hasTracContract()) {
-      console.warn("TRAC contract not configured, falling back to mock staking");
-      return this.mockStake(noteId, userId, amount, position, reasoning);
+      throw new Error("TRAC contract not configured - blockchain integration required for production");
     }
 
     console.log("🏛️ Staking tokens:", {
@@ -101,11 +103,8 @@ export class TokenomicsService {
         transactionHash: tx.hash
       };
     } catch (error) {
-      console.error("❌ Real token staking failed:", error);
-      console.warn("Falling back to mock staking for development");
-
-      // Fallback to mock for development
-      return this.mockStake(noteId, userId, amount, position, reasoning);
+      console.error("❌ Token staking failed:", error);
+      throw new Error(`Staking failed: ${error instanceof Error ? error.message : 'Unknown blockchain error'}`);
     }
   }
 
@@ -165,46 +164,294 @@ export class TokenomicsService {
   }
 
   /**
-   * Calculate rewards for accurate verifications
-   * TODO: Implement reward distribution logic
+   * Calculate and distribute rewards for accurate agent verifications
+   * Based on hackathon requirement: reward agents for accurate analysis
    */
   async calculateRewards(noteId: string, finalVerdict: string) {
-    // TODO: Implement reward calculation and distribution
-    console.log("Calculating rewards for note:", noteId, "with verdict:", finalVerdict);
-    return {
-      totalRewards: 0,
-      individualRewards: []
-    };
+    console.log(`🏆 Calculating rewards for note ${noteId} with final verdict: ${finalVerdict}`);
+
+    try {
+      // Get the original health claim analysis
+      const claimAnalysis = await this.getClaimAnalysis(noteId);
+      if (!claimAnalysis) {
+        console.warn(`No claim analysis found for note ${noteId}`);
+        return { totalRewards: 0, individualRewards: [] };
+      }
+
+      // Get all stakes on this note
+      const stakes = await this.getStakesForNote(noteId);
+
+      // Validate minimum requirements for reward distribution
+      if (stakes.length === 0) {
+        throw new Error(`No stakes found for note ${noteId} - cannot determine community consensus`);
+      }
+
+      const totalStaked = stakes.reduce((sum, stake) => sum + stake.amount, 0);
+      if (totalStaked < 10) { // Minimum 10 TRAC staked for meaningful rewards
+        throw new Error(`Insufficient staking activity (${totalStaked} TRAC) - minimum 10 TRAC required`);
+      }
+
+      // Calculate agent accuracy scores
+      const agentScores = this.calculateAgentAccuracyScores(claimAnalysis, finalVerdict, stakes);
+
+      // Calculate reward pool from staking fees (10% of total staked)
+      const rewardPool = totalStaked * 0.1; // 10% of staked amount goes to rewards
+
+      // Distribute rewards based on accuracy scores
+      const individualRewards = await this.distributeRewards(agentScores, rewardPool, noteId, finalVerdict);
+
+      console.log(`✅ Rewards distributed for note ${noteId}:`, {
+        totalPool: rewardPool,
+        rewardedAgents: individualRewards.length,
+        totalDistributed: individualRewards.reduce((sum, r) => sum + r.amount, 0)
+      });
+
+      return {
+        totalRewards: rewardPool,
+        individualRewards,
+        finalVerdict,
+        consensusAccuracy: agentScores.length > 0 ? agentScores[0]?.accuracy || 0 : 0
+      };
+    } catch (error) {
+      console.error("Failed to calculate rewards:", error);
+      return { totalRewards: 0, individualRewards: [] };
+    }
   }
 
   /**
-   * Mock staking for development
-   * TODO: Remove when real token integration is complete
+   * Get claim analysis from database
    */
-  private async mockStake(
-    noteId: string,
-    userId: string,
-    amount: number,
-    position: "support" | "oppose",
-    reasoning?: string
-  ): Promise<StakeResult> {
-    // Simulate blockchain transaction delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+  private async getClaimAnalysis(noteId: string) {
+    try {
+      // First, find the community note to get the claimId
+      const noteResult = await db
+        .select()
+        .from(communityNotes)
+        .where(eq(communityNotes.noteId, noteId))
+        .limit(1);
 
-    const stakeId = `stake_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    console.log("Mock token staking successful:", stakeId);
-
-    // Mock consensus
-    const consensus = await this.getCommunityConsensus(noteId);
-
-    return {
-      stakeId,
-      communityConsensus: {
-        support: position === "support" ? consensus.support + amount : consensus.support,
-        oppose: position === "oppose" ? consensus.oppose + amount : consensus.oppose
+      if (noteResult.length === 0) {
+        throw new Error(`Community note ${noteId} not found`);
       }
-    };
+
+      const note = noteResult[0];
+      if (!note || !note.claimId) {
+        throw new Error(`Community note ${noteId} has no associated claim`);
+      }
+
+      const claimId = note.claimId;
+
+      // Then find the health claim analysis
+      const claimResult = await db
+        .select()
+        .from(healthClaims)
+        .where(eq(healthClaims.claimId, claimId))
+        .limit(1);
+
+      if (claimResult.length === 0) {
+        throw new Error(`Health claim ${claimId} not found`);
+      }
+
+      const claim = claimResult[0];
+      if (!claim) {
+        throw new Error(`Invalid claim data for ${claimId}`);
+      }
+
+      if (!claim.agentId || !claim.verdict || claim.confidence === null || claim.confidence === undefined) {
+        throw new Error(`Incomplete analysis data found for claim ${claimId}`);
+      }
+
+      return {
+        noteId,
+        claimId,
+        agentVerdict: claim.verdict,
+        confidence: claim.confidence,
+        agentId: claim.agentId,
+        analysis: claim.analysis ? JSON.parse(claim.analysis as string) : null
+      };
+    } catch (error) {
+      console.error(`Failed to get claim analysis for note ${noteId}:`, error);
+      throw new Error(`Unable to retrieve claim analysis: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
+
+  /**
+   * Get all stakes for a note
+   */
+  private async getStakesForNote(noteId: string): Promise<Array<{userId: string, amount: number, position: string}>> {
+    try {
+      const stakeResults = await db
+        .select({
+          userId: stakes.userId,
+          amount: stakes.amount,
+          position: stakes.position
+        })
+        .from(stakes)
+        .where(eq(stakes.noteId, noteId))
+        .orderBy(stakes.createdAt);
+
+      return stakeResults;
+    } catch (error) {
+      console.error(`Failed to get stakes for note ${noteId}:`, error);
+      throw new Error(`Unable to retrieve stakes: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Calculate accuracy scores for agents based on their verdict vs community consensus
+   */
+  private calculateAgentAccuracyScores(claimAnalysis: any, finalVerdict: string, stakes: any[]) {
+    const agentVerdict = claimAnalysis.agentVerdict;
+    const consensusPosition = this.determineConsensusPosition(stakes);
+
+    // Calculate accuracy based on alignment with consensus
+    let accuracy = 0;
+    if (agentVerdict === consensusPosition) {
+      accuracy = 0.9; // High accuracy for matching consensus
+    } else if (agentVerdict === finalVerdict) {
+      accuracy = 0.8; // Good accuracy for matching final verdict
+    } else {
+      accuracy = 0.3; // Low accuracy for being wrong
+    }
+
+    return [{
+      agentId: claimAnalysis.agentId,
+      accuracy,
+      verdict: agentVerdict,
+      confidence: claimAnalysis.confidence
+    }];
+  }
+
+  /**
+   * Determine consensus position from stakes
+   */
+  private determineConsensusPosition(stakes: Array<{userId: string, amount: number, position: string}>): string {
+    const supportTotal = stakes
+      .filter(s => s.position === "support")
+      .reduce((sum, s) => sum + s.amount, 0);
+
+    const opposeTotal = stakes
+      .filter(s => s.position === "oppose")
+      .reduce((sum, s) => sum + s.amount, 0);
+
+    return supportTotal > opposeTotal ? "true" : "false";
+  }
+
+  /**
+   * Distribute rewards to accurate agents
+   */
+  private async distributeRewards(agentScores: any[], rewardPool: number, noteId: string, finalVerdict: string) {
+    const accurateAgents = agentScores.filter(agent => agent.accuracy >= 0.7); // Only reward agents with 70%+ accuracy
+
+    if (accurateAgents.length === 0) {
+      console.log("No agents met accuracy threshold for rewards");
+      return [];
+    }
+
+    // Distribute rewards proportionally based on accuracy
+    const totalAccuracy = accurateAgents.reduce((sum, agent) => sum + agent.accuracy, 0);
+
+    const rewards = accurateAgents.map(agent => {
+      const rewardAmount = (agent.accuracy / totalAccuracy) * rewardPool;
+      return {
+        agentId: agent.agentId,
+        amount: Math.floor(rewardAmount * 100) / 100, // Round to 2 decimal places
+        accuracy: agent.accuracy,
+        verdict: agent.verdict,
+        reason: `Accurate ${agent.verdict} verdict with ${(agent.accuracy * 100).toFixed(1)}% accuracy`
+      };
+    });
+
+    // Actually distribute the rewards (transfer TRAC tokens)
+    const distributedRewards = [];
+    for (const reward of rewards) {
+      try {
+        // Validate agent has a registered wallet
+        const agentAddress = await this.getAgentWalletAddress(reward.agentId);
+        if (!agentAddress) {
+          console.warn(`Skipping reward for agent ${reward.agentId} - no wallet address registered`);
+          continue;
+        }
+
+        const tx = await this.distributeRewardToAgent(reward.agentId, reward.amount);
+
+        // Record reward in database
+        await db.insert(agentRewards).values({
+          agentId: reward.agentId,
+          noteId,
+          amount: reward.amount,
+          accuracy: reward.accuracy,
+          verdict: reward.verdict,
+          finalVerdict,
+          transactionHash: tx.hash || null,
+          distributedAt: new Date(),
+          reason: reward.reason
+        });
+
+        distributedRewards.push({
+          ...reward,
+          transactionHash: tx.hash || null
+        });
+
+        console.log(`💰 Distributed ${reward.amount} TRAC to agent ${reward.agentId} (tx: ${tx.hash || 'pending'})`);
+      } catch (error) {
+        console.error(`Failed to distribute reward to agent ${reward.agentId}:`, error);
+      }
+    }
+
+    return distributedRewards;
+  }
+
+  /**
+   * Distribute TRAC tokens to an agent
+   */
+  private async distributeRewardToAgent(agentId: string, amount: number) {
+    // Get agent wallet address (would be stored in agent registry)
+    const agentAddress = await this.getAgentWalletAddress(agentId);
+
+    if (!agentAddress) {
+      throw new Error(`No wallet address found for agent ${agentId}`);
+    }
+
+    // Transfer TRAC tokens to agent
+    const tokenAmount = this.tokenService.parseTracAmount(amount.toString());
+    const tx = await this.tokenService.transferTrac(agentAddress, tokenAmount);
+
+    console.log(`✅ Reward transfer completed: ${amount} TRAC to ${agentAddress}, tx: ${tx.hash || 'pending'}`);
+
+    return tx;
+  }
+
+  /**
+   * Get agent wallet address from agent registry
+   */
+  private async getAgentWalletAddress(agentId: string): Promise<string | null> {
+    try {
+      // In production, this would query an agent registry service or database
+      // For now, use a hardcoded mapping for known agents
+      const agentRegistry: Record<string, string> = {
+        "agent_123": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+        "agent_456": "0x742d35Cc6634C0532925a3b844Bc454e4438f44f",
+        // Add more agents as they register
+      };
+
+      const address = agentRegistry[agentId];
+      if (!address) {
+        console.warn(`Agent ${agentId} not found in registry`);
+        return null;
+      }
+
+      // Validate address format
+      if (!ethers.isAddress(address)) {
+        throw new Error(`Invalid wallet address for agent ${agentId}: ${address}`);
+      }
+
+      return address;
+    } catch (error) {
+      console.error(`Failed to get wallet address for agent ${agentId}:`, error);
+      return null;
+    }
+  }
+
 
 }

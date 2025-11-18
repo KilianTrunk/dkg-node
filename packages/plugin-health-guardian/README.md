@@ -11,6 +11,7 @@ The Health Guardian plugin creates a **decentralized health claims verification 
 **AI-Powered Analysis** - Uses configurable LLM providers (OpenAI, Anthropic, Groq, Mistral) for health claim verification
 **Community Notes** - Publish verified health analyses as DKG Knowledge Assets with structured JSON-LD
 **Tokenomics Integration** - TRAC token staking for community consensus and reputation
+**Agent Rewards** - TRAC token rewards for accurate AI agents based on community consensus alignment
 **Premium Access** - x402-compatible micropayments for exclusive content
 **Real-time Metrics** - Comprehensive health monitoring and analytics dashboard
 **MCP Integration** - Full Model Context Protocol support for AI agent workflows
@@ -22,7 +23,17 @@ The Health Guardian plugin creates a **decentralized health claims verification 
 
 1. **Agent Layer** - MCP tools for AI agents to analyze claims and publish notes
 2. **Knowledge Layer** - DKG Knowledge Assets for tamper-proof health information
-3. **Trust Layer** - Tokenomics and staking for community-driven verification
+3. **Trust Layer** - Tokenomics, staking, and agent rewards for community-driven verification
+
+### Agent Rewards System
+
+The plugin implements a **hackathon requirement** to reward accurate AI agents:
+
+- **Accuracy Scoring**: Agents are scored based on alignment with community consensus
+- **Reward Pool**: 10% of total staked TRAC tokens forms the reward pool
+- **Proportional Distribution**: Rewards distributed based on agent accuracy scores
+- **Blockchain Settlement**: TRAC tokens transferred to agent wallets on Neuroweb
+- **Transparency**: All rewards recorded in database with transaction hashes
 
 ### Service Architecture
 
@@ -94,6 +105,7 @@ The plugin automatically registers with the DKG Node Agent. Once configured, it'
 - `GET /health/claims` - Retrieve analyzed health claims
 - `GET /health/notes` - Get published community notes
 - `GET /health/stakes/:noteId` - View staking consensus for a note
+- `GET /health/rewards` - View agent reward distributions
 
 ### Metrics & Monitoring
 - `GET /health/status` - System health check
@@ -165,6 +177,18 @@ The plugin automatically registers with the DKG Node Agent. Once configured, it'
 }
 ```
 
+### distribute-agent-rewards
+**Distribute TRAC token rewards to accurate AI agents**
+
+```typescript
+{
+  noteId: "note_456",
+  finalVerdict: "false"
+}
+```
+
+**Response**: Reward distribution summary with individual agent payouts
+
 ## Data Model
 
 ### Health Claims
@@ -217,6 +241,22 @@ premium_access (
   paymentAmount REAL,
   grantedAt DATETIME,
   expiresAt DATETIME
+)
+```
+
+### Agent Rewards
+```sql
+agent_rewards (
+  id INTEGER PRIMARY KEY,
+  agentId TEXT,           -- ID of rewarded agent
+  noteId TEXT,            -- Note that was accurately analyzed
+  amount REAL,            -- TRAC tokens rewarded
+  accuracy REAL,          -- Accuracy score (0.0-1.0)
+  verdict TEXT,           -- Agent's verdict
+  finalVerdict TEXT,      -- Community consensus verdict
+  transactionHash TEXT,   -- Blockchain transaction hash
+  distributedAt DATETIME, -- When reward was distributed
+  reason TEXT             -- Reason for reward
 )
 ```
 

@@ -76,7 +76,7 @@ export function registerPublishNoteTool(
         return {
           content: [{
             type: "text",
-            text: `Community Note published successfully!\n\nUAL: ${result.UAL}\nNote ID: ${noteId}\nVerdict: ${verdict.toUpperCase()}\nConfidence: ${(confidence * 100).toFixed(1)}%`
+            text: `Community Note published successfully!\n\nUAL: ${result.UAL}\nNote ID: ${noteId}\nVerdict: ${verdict.toUpperCase()}\nConfidence: ${(confidence * 100).toFixed(1)}%\n\n💎 **Premium Access Available**: Pay 1 TRAC for enhanced analysis with expert commentary, medical citations, statistical data, and comprehensive bias assessment.`
           }],
           noteId,
           ual: result.UAL

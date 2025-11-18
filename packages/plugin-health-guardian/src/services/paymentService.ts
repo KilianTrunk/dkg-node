@@ -1,226 +1,177 @@
-import { getPaymentConfig } from "../config";
+import { getPaymentConfig, getTokenConfig } from "../config";
 import { ethers } from "ethers";
 import { BlockchainProvider } from "./blockchainProvider";
+import { TokenContractService } from "./tokenContractService";
 
 /**
- * x402 Payment Protocol Service
- * Implements HTTP 402 micropayments for premium content access
+ * Premium Payment Service
+ * Implements TRAC token payments for premium content access (like staking)
  */
 export class PaymentService {
   private blockchainProvider!: BlockchainProvider;
+  private tokenService!: TokenContractService;
   private initialized = false;
 
   async initialize() {
     if (this.initialized) return;
 
-    console.log("💰 Initializing x402 Payment Service...");
+    console.log("💰 Initializing Premium Payment Service...");
 
-    // Initialize blockchain provider for stablecoin payments
+    // Initialize blockchain provider for TRAC payments (like staking)
     this.blockchainProvider = new BlockchainProvider();
     await this.blockchainProvider.initialize();
 
+    // Initialize token contract service for TRAC transfers
+    this.tokenService = new TokenContractService(this.blockchainProvider);
+    await this.tokenService.initialize();
+
     this.initialized = true;
 
-    const paymentConfig = getPaymentConfig();
-    console.log("✅ x402 Payment Service initialized with config:", {
-      stablecoin: paymentConfig.stablecoinAddress,
-      threshold: paymentConfig.micropaymentThreshold,
+    const tokenConfig = getTokenConfig();
+    console.log("✅ Premium Payment Service initialized with config:", {
+      tracContract: tokenConfig.TRAC.contractAddress,
       network: this.blockchainProvider.getNetworkName()
     });
   }
 
   /**
-   * Request premium access payment using x402 protocol
-   * Returns HTTP 402 payment required information
+   * Process premium access payment using TRAC tokens (like staking)
+   * Transfers TRAC tokens and grants immediate access
+   */
+  async processPremiumAccess(
+    userId: string,
+    noteId: string,
+    amount: number
+  ): Promise<{ transactionHash: string; grantedAt: Date; expiresAt: Date }> {
+    await this.initialize();
+
+    const tokenConfig = getTokenConfig();
+    if (amount < 0.01) { // Minimum 0.01 TRAC for premium access
+      throw new Error(`Payment amount must be at least 0.01 TRAC`);
+    }
+
+    if (!this.tokenService.hasTracContract()) {
+      throw new Error("TRAC contract not configured - blockchain integration required for premium access");
+    }
+
+    console.log("💳 Processing TRAC premium access payment:", {
+      userId,
+      noteId,
+      amount,
+      currency: "TRAC"
+    });
+
+    try {
+      // Get user wallet address (in production, this would be from user auth)
+      const userAddress = await this.getUserWalletAddress(userId);
+      if (!userAddress) {
+        throw new Error(`No wallet address found for user ${userId}`);
+      }
+
+      // Check user balance
+      const balance = await this.tokenService.getTracBalance(userAddress);
+      const requiredAmount = this.tokenService.parseTracAmount(amount.toString());
+
+      if (balance < requiredAmount) {
+        throw new Error(`Insufficient TRAC balance. Required: ${this.tokenService.formatTracAmount(requiredAmount)}, Available: ${this.tokenService.formatTracAmount(balance)}`);
+      }
+
+      // Generate premium access pool address (like staking pools)
+      const premiumPoolAddress = this.generatePremiumPoolAddress(noteId);
+
+      // Transfer TRAC tokens to premium pool
+      const tx = await this.tokenService.transferTrac(premiumPoolAddress, requiredAmount);
+
+      // Calculate access period (24 hours from now)
+      const grantedAt = new Date();
+      const expiresAt = new Date(grantedAt.getTime() + 24 * 60 * 60 * 1000); // 24 hours
+
+      console.log("✅ Premium access payment completed:", {
+        userId,
+        noteId,
+        amount: this.tokenService.formatTracAmount(requiredAmount),
+        transactionHash: tx.hash,
+        grantedAt,
+        expiresAt
+      });
+
+      return {
+        transactionHash: tx.hash || '',
+        grantedAt,
+        expiresAt
+      };
+    } catch (error) {
+      console.error("❌ Premium access payment failed:", error);
+      throw new Error(`Premium access payment failed: ${error instanceof Error ? error.message : 'Unknown blockchain error'}`);
+    }
+  }
+
+  /**
+   * Request premium access payment (legacy x402 compatibility)
+   * Now processes payment immediately like staking
    */
   async requestPremiumAccess(
     userId: string,
     noteId: string,
     amount: number
   ): Promise<{ paymentUrl: string; paymentId: string; paymentHeaders: Record<string, string> }> {
-    await this.initialize();
+    // Process payment immediately and return success info
+    const result = await this.processPremiumAccess(userId, noteId, amount);
 
-    const paymentConfig = getPaymentConfig();
-    if (amount < paymentConfig.micropaymentThreshold) {
-      throw new Error(`Payment amount must be at least ${paymentConfig.micropaymentThreshold}`);
-    }
-
-    console.log("💳 Requesting x402 premium access payment:", {
-      userId,
-      noteId,
-      amount,
-      currency: "USD"
-    });
-
-    try {
-      // Generate payment ID
-      const paymentId = `x402_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      // Create x402 payment URL (could be a wallet app or payment processor)
-      const paymentUrl = this.generateX402PaymentUrl(paymentId, amount, noteId);
-
-      // Generate x402 payment headers for HTTP 402 response
-      const paymentHeaders = this.generateX402Headers(paymentId, amount, noteId);
-
-      console.log("✅ x402 payment request created:", { paymentId, paymentUrl });
-
-      return {
-        paymentUrl,
-        paymentId,
-        paymentHeaders
-      };
-    } catch (error) {
-      console.error("❌ x402 payment request failed:", error);
-      console.warn("Falling back to mock payment for development");
-
-      // Fallback to mock for development
-      return this.mockRequestPayment(userId, noteId, amount);
-    }
-  }
-
-  /**
-   * Verify x402 payment completion
-   * Checks if the payment has been processed on-chain
-   */
-  async verifyPayment(paymentId: string): Promise<boolean> {
-    await this.initialize();
-
-    try {
-      console.log("🔍 Verifying x402 payment:", paymentId);
-
-      // 1. Check on-chain transaction status
-      // 2. Verify payment amount and recipient
-      // 3. Confirm transaction finality
-
-      const isVerified = await this.simulatePaymentVerification(paymentId);
-
-      console.log(`✅ Payment verification ${isVerified ? 'successful' : 'failed'}:`, paymentId);
-      return isVerified;
-    } catch (error) {
-      console.error("❌ x402 payment verification failed:", error);
-      console.warn("Falling back to mock verification");
-
-      // Fallback to mock for development
-      return this.mockVerifyPayment(paymentId);
-    }
-  }
-
-  /**
-   * Grant premium access after successful x402 payment
-   */
-  async grantPremiumAccess(
-    userId: string,
-    noteId: string,
-    paymentId: string
-  ): Promise<{ accessGranted: boolean; expiresAt: Date; transactionHash?: string }> {
-    const paymentVerified = await this.verifyPayment(paymentId);
-
-    if (!paymentVerified) {
-      throw new Error("x402 payment verification failed");
-    }
-
-    // Grant 24-hour access
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-    console.log("🎉 x402 premium access granted:", {
-      userId,
-      noteId,
-      paymentId,
-      expiresAt
-    });
-
+    // Return format compatible with existing x402 expectations
     return {
-      accessGranted: true,
-      expiresAt,
-      transactionHash: `0x${paymentId.split('_')[2]}...` // Mock tx hash from payment ID
-    };
-  }
-
-  /**
-   * Generate x402 payment URL
-   */
-  private generateX402PaymentUrl(paymentId: string, amount: number, noteId: string): string {
-    // - A wallet deep link (e.g., metamask://, trust://)
-    // - A payment processor URL
-    // - An x402-compatible payment gateway
-
-    const baseUrl = process.env.X402_PAYMENT_GATEWAY || "https://x402.example.com";
-    const params = new URLSearchParams({
-      paymentId,
-      amount: amount.toString(),
-      currency: "USD",
-      description: `Premium access to health note ${noteId}`,
-      callbackUrl: `${process.env.APP_URL || 'http://localhost:9200'}/api/health/premium/callback`
-    });
-
-    return `${baseUrl}/pay?${params.toString()}`;
-  }
-
-  /**
-   * Generate x402 HTTP headers for 402 Payment Required response
-   */
-  private generateX402Headers(paymentId: string, amount: number, noteId: string): Record<string, string> {
-    return {
-      'HTTP/1.1': '402 Payment Required',
-      'X-Payment-Amount': amount.toString(),
-      'X-Payment-Currency': 'USD',
-      'X-Payment-ID': paymentId,
-      'X-Payment-Description': `Premium access to health note ${noteId}`,
-      'X-Payment-Callback': `${process.env.APP_URL || 'http://localhost:9200'}/api/health/premium/callback`,
-      'Content-Type': 'application/json'
-    };
-  }
-
-  /**
-   * Simulate payment verification
-   */
-  private async simulatePaymentVerification(paymentId: string): Promise<boolean> {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // For demo purposes, 90% success rate
-    const success = Math.random() > 0.1;
-
-    console.log(`Simulated payment verification for ${paymentId}:`, success ? "SUCCESS" : "FAILED");
-    return success;
-  }
-
-  /**
-   * Mock payment request for development
-   */
-  private async mockRequestPayment(
-    userId: string,
-    noteId: string,
-    amount: number
-  ): Promise<{ paymentUrl: string; paymentId: string; paymentHeaders: Record<string, string> }> {
-    const paymentId = `payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const paymentUrl = `https://mock-payment.example.com/pay/${paymentId}?amount=${amount}`;
-
-    console.log("Mock payment request created:", paymentId);
-
-    return {
-      paymentUrl,
-      paymentId,
+      paymentUrl: `completed:${result.transactionHash}`,
+      paymentId: `premium_${Date.now()}`,
       paymentHeaders: {
-        'X-Mock-Payment': 'true',
-        'X-Payment-ID': paymentId,
-        'X-Payment-Amount': amount.toString()
+        'X-Payment-Status': 'completed',
+        'X-Transaction-Hash': result.transactionHash,
+        'X-Granted-At': result.grantedAt.toISOString(),
+        'X-Expires-At': result.expiresAt.toISOString()
       }
     };
   }
 
   /**
-   * Mock payment verification
+   * Get user wallet address (production implementation)
    */
-  private async mockVerifyPayment(paymentId: string): Promise<boolean> {
-    // Simulate payment processing delay
-    await new Promise(resolve => setTimeout(resolve, 200));
+  private async getUserWalletAddress(userId: string): Promise<string | null> {
+    try {
+      // In production, this would query user registry or auth system
+      // For now, use a hardcoded mapping for demo users
+      const userRegistry: Record<string, string> = {
+        "demo_user": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e", // Same as agent for demo
+        "user_123": "0x742d35Cc6634C0532925a3b844Bc454e4438f44f",
+        // Add more users as they register
+      };
 
-    // Mock successful payment (90% success rate for testing)
-    const success = Math.random() > 0.1;
+      const address = userRegistry[userId];
+      if (!address) {
+        console.warn(`User ${userId} not found in registry`);
+        return null;
+      }
 
-    console.log(`Mock payment verification for ${paymentId}:`, success ? "SUCCESS" : "FAILED");
+      // Validate address format
+      if (!ethers.isAddress(address)) {
+        throw new Error(`Invalid wallet address for user ${userId}: ${address}`);
+      }
 
-    return success;
+      return address;
+    } catch (error) {
+      console.error(`Failed to get wallet address for user ${userId}:`, error);
+      return null;
+    }
   }
+
+  /**
+   * Generate premium access pool address (like staking pools)
+   */
+  private generatePremiumPoolAddress(noteId: string): string {
+    // Generate deterministic address based on note for premium access pool
+    const hash = ethers.keccak256(
+      ethers.toUtf8Bytes(`${noteId}-premium-access-pool`)
+    );
+    return ethers.getAddress(ethers.dataSlice(hash, 0, 20));
+  }
+
 }
+

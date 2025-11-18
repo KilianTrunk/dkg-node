@@ -30,12 +30,19 @@ export function registerAnalyzeClaimTool(
 
         const analysis = await aiService.analyzeHealthClaim(claim, context);
 
-        // Store claim in database for tracking
+        // Store claim and analysis in database for tracking and rewards
         const claimId = `claim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const agentId = "agent_123"; // In production, this would come from authenticated agent context
+
         await db.insert(healthClaims).values({
           claimId,
           claim,
           status: "analyzing",
+          agentId,
+          verdict: analysis.verdict,
+          confidence: analysis.confidence,
+          analysis: JSON.stringify(analysis), // Store full analysis as JSON
+          analyzedAt: new Date(),
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -45,7 +52,7 @@ export function registerAnalyzeClaimTool(
         return {
           content: [{
             type: "text",
-            text: `Health Claim Analysis:\n\nClaim: ${claim}\nVerdict: ${analysis.verdict.toUpperCase()}\nConfidence: ${(analysis.confidence * 100).toFixed(1)}%\n\nSummary: ${analysis.summary}\n\nSources: ${analysis.sources.join(", ")}\n\nClaim ID: ${claimId} (save this for publishing)`
+            text: `Health Claim Analysis:\n\nClaim: ${claim}\nVerdict: ${analysis.verdict.toUpperCase()}\nConfidence: ${(analysis.confidence * 100).toFixed(1)}%\n\nSummary: ${analysis.summary}\n\nSources: ${analysis.sources.join(", ")}\n\nClaim ID: ${claimId} (save this for publishing)\n\n💎 **Premium Access Available**: For enhanced analysis with expert commentary, medical citations, statistical data, and bias assessment, publish this as a Community Note and pay 1 TRAC for premium access.`
           }],
           claimId,
           analysis
