@@ -4,9 +4,10 @@ import { eq, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { z } from "zod";
 import { GetNoteSchema } from "../types";
-import { IDkgService } from "../types";
-import { communityNotes, stakes, premiumAccess } from "../database";
+import { IDkgService, IAIAnalysisService } from "../types";
+import { communityNotes, stakes, premiumAccess, healthClaims } from "../database";
 import * as schema from "../database/schema";
+import type { LiteratureService } from "../services";
 
 /**
  * Generate basic note content for regular users
@@ -30,7 +31,7 @@ function generateBasicNoteContent(content: any, stakesData: any[], note?: any, u
 /**
  * Generate premium note content with enhanced analysis
  */
-function generatePremiumNoteContent(content: any, stakesData: any[], note?: any): string {
+async function generatePremiumNoteContent(content: any, stakesData: any[], note: any, aiService: IAIAnalysisService, literatureService: LiteratureService, originalClaim: string): Promise<string> {
   // Calculate consensus metrics
   const supportStakes = stakesData.filter(s => s.position === 'support');
   const opposeStakes = stakesData.filter(s => s.position === 'oppose');
@@ -64,7 +65,7 @@ ${getAnalysisMethodology(content)}
 ${getExpertCommentary(content.verdict, content.confidence)}
 
 **📖 RELATED MEDICAL LITERATURE:**
-${getRelatedStudies(content.sources)}
+${await literatureService.getLiteratureSummary(originalClaim || content.description || content.summary || "medical research", aiService)}
 
 **⚖️ BIAS ASSESSMENT:**
 ${assessBiasAndLimitations(content)}
@@ -266,6 +267,8 @@ export function registerGetNoteTool(
   mcp: McpServer,
   ctx: DkgContext,
   dkgService: IDkgService,
+  aiService: IAIAnalysisService,
+  literatureService: LiteratureService,
   db: BetterSQLite3Database<typeof schema>
 ) {
   mcp.registerTool(
@@ -355,11 +358,29 @@ export function registerGetNoteTool(
         // Generate response based on access level
         let responseText: string;
         if (hasPremiumAccess) {
-          responseText = generatePremiumNoteContent(content, stakesData, note);
+          // Get the original claim from the healthClaims table
+          let originalClaim = "";
+          if (noteId) {
+            try {
+              const noteResult = await db.select({ claimId: communityNotes.claimId }).from(communityNotes).where(eq(communityNotes.noteId, noteId)).limit(1);
+              if (noteResult.length > 0) {
+                const note = noteResult[0];
+                if (note && note.claimId) {
+                  const claimResult = await db.select({ claim: healthClaims.claim }).from(healthClaims).where(eq(healthClaims.claimId, note.claimId)).limit(1);
+                  if (claimResult.length > 0 && claimResult[0]) {
+                    originalClaim = claimResult[0].claim;
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn("Failed to get original claim for literature search:", error);
+            }
+          }
+          responseText = await generatePremiumNoteContent(content, stakesData, note, aiService, literatureService, originalClaim);
         } else {
           responseText = generateBasicNoteContent(content, stakesData, note, ual);
           if (userId) {
-            responseText += `\n\n💎 **Premium Access Available**: Pay 1 TRAC for enhanced analysis, expert commentary, medical citations, statistical data, and bias assessment.`;
+            responseText += `\n\n💎 **Premium Access Available**: Pay 1 TRAC for enhanced analysis with expert commentary, medical citations from Europe PMC, statistical data, and comprehensive bias assessment.`;
           }
         }
 

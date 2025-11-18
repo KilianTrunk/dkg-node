@@ -52,7 +52,7 @@ export function registerAnalyzeClaimTool(
         return {
           content: [{
             type: "text",
-            text: `Health Claim Analysis:\n\nClaim: ${claim}\nVerdict: ${analysis.verdict.toUpperCase()}\nConfidence: ${(analysis.confidence * 100).toFixed(1)}%\n\nSummary: ${analysis.summary}\n\nSources: ${analysis.sources.join(", ")}\n\nClaim ID: ${claimId} (save this for publishing)\n\n💎 **Premium Access Available**: For enhanced analysis with expert commentary, medical citations, statistical data, and bias assessment, publish this as a Community Note and pay 1 TRAC for premium access.`
+            text: `Health Claim Analysis:\n\nClaim: ${claim}\nVerdict: ${analysis.verdict.toUpperCase()}\nConfidence: ${(analysis.confidence * 100).toFixed(1)}%\n\nSummary: ${analysis.summary}\n\nSources: ${analysis.sources.join(", ")}\n\nClaim ID: ${claimId} (save this for publishing)\n\n💎 **Want premium access?** First publish this as a Community Note, then pay 1 TRAC for enhanced analysis with expert commentary, medical citations, statistical data, and bias assessment.\n\nLet me know if you'd like me to publish this note!`
           }],
           claimId,
           analysis

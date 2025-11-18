@@ -5,6 +5,7 @@ import { DkgService } from "./dkgService";
 import { TokenomicsService } from "./tokenomicsService";
 import { PaymentService } from "./paymentService";
 import { MetricsService } from "./MetricsService";
+import { LiteratureService } from "./literatureService";
 import type { HealthGuardianConfig } from "../config";
 
 export type ServiceConfig = HealthGuardianConfig;
@@ -42,13 +43,18 @@ export async function initializeServices(
   const metricsService = new MetricsService();
   container.register("metricsService", metricsService);
 
+  // Initialize Literature Service
+  const literatureService = new LiteratureService();
+  container.register("literatureService", literatureService);
+
   // Initialize all services asynchronously
   try {
     await Promise.all([
       aiService.initializeAIClient(),
       dkgService.initialize(dkgContext),
       tokenomicsService.initialize(),
-      paymentService.initialize()
+      paymentService.initialize(),
+      literatureService.initialize()
     ]);
     console.log("All Health Guardian services initialized successfully");
   } catch (error) {
@@ -87,3 +93,4 @@ export { DkgService } from "./dkgService";
 export { TokenomicsService } from "./tokenomicsService";
 export { PaymentService } from "./paymentService";
 export { MetricsService } from "./MetricsService";
+export { LiteratureService } from "./literatureService";

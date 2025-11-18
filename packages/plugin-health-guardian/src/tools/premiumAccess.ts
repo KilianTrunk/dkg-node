@@ -59,7 +59,7 @@ export function registerPremiumAccessTool(
         return {
           content: [{
             type: "text",
-            text: `✅ Premium access granted for ${paymentAmount} TRAC!\n\n🔗 [View Transaction](${txUrl})\n\nYou now have access to:\n- Enhanced analysis methodology\n- Expert medical commentary\n- Related medical studies & citations\n- Statistical confidence intervals\n- Source credibility assessment\n- Bias analysis & limitations\n\nAccess valid until: ${paymentResult.expiresAt.toISOString()}`
+            text: `✅ Premium access granted for ${paymentAmount} TRAC!\n\n🔗 [View Transaction](${txUrl})\n\nYou now have access to:\n- Enhanced analysis methodology\n- Expert medical commentary\n- Related medical studies & citations from Europe PMC\n- Statistical confidence intervals\n- Source credibility assessment\n- Bias analysis & limitations\n\nAccess valid for 24 hours until: ${paymentResult.expiresAt.toISOString()}\n\nUse the same note retrieval command again to see the premium content!`
           }],
           transactionHash: paymentResult.transactionHash,
           grantedAt: paymentResult.grantedAt,

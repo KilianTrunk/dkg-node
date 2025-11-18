@@ -116,23 +116,67 @@ Provide your analysis in the following JSON format:
         { role: "user", content: userPrompt }
       ]);
 
-      // Parse the JSON response
-      const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
-      const parsed = JSON.parse(content);
+      aiLogger.info("LLM Response received", {
+        responseType: typeof response,
+        hasContent: !!response?.content,
+        contentType: typeof response?.content,
+        contentLength: response?.content?.length || 0
+      });
+
+      // Extract content more robustly
+      let content: string;
+      if (typeof response.content === 'string') {
+        content = response.content;
+      } else if (response.content && typeof response.content === 'object') {
+        // Handle different response formats
+        if (Array.isArray(response.content)) {
+          // Sometimes LLM returns array of message parts
+          content = response.content.map(part =>
+            typeof part === 'string' ? part : part.text || JSON.stringify(part)
+          ).join('');
+        } else if (response.content.text) {
+          content = response.content.text;
+        } else {
+          content = JSON.stringify(response.content);
+        }
+      } else {
+        throw new Error("Unexpected response format from LLM");
+      }
+
+      aiLogger.info("Extracted content for parsing", { content: content.substring(0, 200) });
+
+      // Try to extract JSON from the content
+      let jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("No JSON found in LLM response");
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
 
       // Validate the response structure
-      if (!parsed.verdict || !parsed.summary || !Array.isArray(parsed.sources)) {
-        throw new Error("Invalid response structure from LLM");
+      if (!parsed.verdict || !parsed.summary) {
+        aiLogger.warn("Invalid response structure", { parsed });
+        throw new Error("Invalid response structure from LLM - missing required fields");
+      }
+
+      // Ensure verdict is valid
+      const validVerdicts = ["true", "false", "misleading", "uncertain"];
+      if (!validVerdicts.includes(parsed.verdict)) {
+        aiLogger.warn("Invalid verdict value", { verdict: parsed.verdict });
+        parsed.verdict = "uncertain";
       }
 
       return {
         verdict: parsed.verdict,
         confidence: Math.max(0, Math.min(1, parsed.confidence || 0.5)), // Clamp to 0-1
         summary: parsed.summary,
-        sources: parsed.sources
+        sources: Array.isArray(parsed.sources) ? parsed.sources : ["General Medical Literature"]
       };
     } catch (error) {
-      aiLogger.error("Failed to parse LLM response", { error });
+      aiLogger.error("Failed to parse LLM response", {
+        error: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined
+      });
       throw new Error("Failed to analyze claim with AI");
     }
   }

@@ -5,6 +5,7 @@ import { config as dotenvConfig } from "dotenv";
 import path from "path";
 import { loadConfig, type HealthGuardianConfig } from "./config";
 import type { IAIAnalysisService, IDkgService, ITokenomicsService, IPaymentService, IMetricsService } from "./types";
+import type { LiteratureService } from "./services";
 import { initializeServices, shutdownServices, ServiceContainer } from "./services";
 import { db, healthClaims, communityNotes, stakes, premiumAccess, agentRewards } from "./database";
 
@@ -72,10 +73,11 @@ export default defineDkgPlugin((ctx, mcp, api) => {
       const dkgService = container.get<IDkgService>("dkgService");
       const tokenomicsService = container.get<ITokenomicsService>("tokenomicsService");
       const paymentService = container.get<IPaymentService>("paymentService");
+      const literatureService = container.get<LiteratureService>("literatureService");
 
       registerAnalyzeClaimTool(mcp, ctx, aiService, db);
       registerPublishNoteTool(mcp, ctx, dkgService, db);
-      registerGetNoteTool(mcp, ctx, dkgService, db);
+      registerGetNoteTool(mcp, ctx, dkgService, aiService, literatureService, db);
       registerStakeTokensTool(mcp, ctx, tokenomicsService, db);
       registerPremiumAccessTool(mcp, ctx, paymentService, db);
       registerDistributeRewardsTool(mcp, ctx, tokenomicsService);
