@@ -39,8 +39,6 @@ export function registerPremiumAccessTool(
           if (recentNotes.length > 0 && recentNotes[0]) {
             // Use the most recent note as the target
             targetNoteId = recentNotes[0].noteId;
-
-            console.log(`Found recent note for premium access: ${targetNoteId}`);
           } else {
             // Fallback to recent claims if no notes found
             const recentClaims = await db.select()

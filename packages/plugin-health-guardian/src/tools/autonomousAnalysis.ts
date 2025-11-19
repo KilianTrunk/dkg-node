@@ -81,7 +81,7 @@ export function registerAutonomousAnalysisTool(
           `🤖 **Agent:** ${agent.name} (${agent.agentId})`,
           `📝 **Claim ID:** ${result.claimId}`,
           `📋 **Community Note:** ${result.noteId}`,
-          `🔗 **DKG Permanent Record:** ${sanitizeUrl(`https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(result.ual)}`)}`,
+          `🔗 **DKG Permanent Record:** ${sanitizeUrl(`https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(result.ual || '')}`)}`,
           `💰 **Auto-Stake:** ${result.stakeId} (1 TRAC)`,
           `⏱️ **Execution Time:** ${result.executionTime}ms`,
           ``,

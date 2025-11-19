@@ -176,7 +176,7 @@ Provide your analysis in the following JSON format:
       aiLogger.info("Extracted content for parsing", { content: content.substring(0, 200) });
 
       // Try to extract JSON from the content
-      let jsonMatch = content.match(/\{[\s\S]*\}/);
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error("No JSON found in LLM response");
       }
@@ -199,7 +199,7 @@ Provide your analysis in the following JSON format:
       // Clean HTML tags from AI-generated content
       const cleanSummary = cleanText(parsed.summary);
       const cleanSources = Array.isArray(parsed.sources)
-        ? parsed.sources.map(source => cleanText(source))
+        ? parsed.sources.map((source: any) => cleanText(source))
         : ["General Medical Literature"];
 
       return {

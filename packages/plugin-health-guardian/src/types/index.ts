@@ -137,6 +137,40 @@ export interface ConsensusData {
   oppose: number;
 }
 
+// Workflow types
+export interface WorkflowProgress {
+  currentStep: string;
+  stepNumber: number;
+  totalSteps: number;
+  percentage: number;
+  message: string;
+  startTime: number;
+  elapsedTime: number;
+  estimatedTimeRemaining?: number;
+}
+
+export type ProgressCallback = (progress: WorkflowProgress) => void;
+
+export interface WorkflowResult {
+  success: boolean;
+  claimId: string;
+  noteId?: string;
+  ual?: string;
+  stakeId?: string;
+  rewardId?: string;
+  errors: string[];
+  executionTime: number;
+  progress?: WorkflowProgress;
+}
+
+// Agent types
+export interface AgentIdentity {
+  agentId: string;
+  name: string;
+  role?: string;
+  permissions?: string[];
+}
+
 // API Response types
 export interface ApiResponse<T = any> {
   success: boolean;

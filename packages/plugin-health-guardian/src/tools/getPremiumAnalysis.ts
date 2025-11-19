@@ -28,21 +28,10 @@ export function registerGetPremiumAnalysisTool(
       try {
         const userId = "demo_user"; // Mock user ID
 
-        // First check if user has premium access to this note
-        console.log(`Checking premium access for user: ${userId}, noteId: ${noteId}`);
-
-        // Debug: Show all premium access records
-        const allAccess = await db.select().from(premiumAccess);
-        console.log(`All premium access records in database:`, allAccess);
-
+        // Check if user has premium access to this note
         const accessCheck = await db.select()
           .from(premiumAccess)
           .where(sql`${premiumAccess.noteId} = ${noteId} AND ${premiumAccess.userId} = ${userId} AND ${premiumAccess.expiresAt} > datetime('now')`);
-
-        console.log(`Found ${accessCheck.length} premium access records for note ${noteId}`);
-        if (accessCheck.length > 0) {
-          console.log(`Access record:`, accessCheck[0]);
-        }
 
         if (accessCheck.length === 0 || !accessCheck[0]) {
           return {
