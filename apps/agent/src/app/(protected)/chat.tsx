@@ -593,7 +593,7 @@ export default function ChatPage() {
                   tools.toggleAll(enabled);
                 }}
                 disabled={isGenerating}
-                style={[{ maxWidth: 800 }, isWeb && { pointerEvents: "auto" }]}
+                style={[{ maxWidth: 800 }, isWeb && { pointerEvents: "auto" as any }]}
               />
             </Container>
           </View>

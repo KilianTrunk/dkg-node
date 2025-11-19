@@ -8,6 +8,64 @@ import Checkbox from "@/components/Checkbox";
 import { Collapsible } from "react-native-fast-collapsible";
 import Spinner from "@/components/Spinner";
 
+/**
+ * Format structured analysis responses from Medsy tools
+ */
+function formatAnalysisResponse(data: any): string {
+  if (data.analysisType === 'autonomous' && data.workflowResult) {
+    const wf = data.workflowResult;
+    const dkgUrl = wf.ual ? `https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(wf.ual)}` : 'N/A';
+    return `✅ **Autonomous Health Analysis Complete!**
+
+🤖 **Agent:** ${wf.agent?.name || 'Unknown'} (${wf.agent?.agentId || 'Unknown'})
+📝 **Claim ID:** ${wf.claimId || 'N/A'}
+📋 **Community Note:** ${wf.noteId || 'N/A'}
+🔗 **DKG Permanent Record:** ${dkgUrl}
+
+   **Full UAL:** ${wf.ual || 'N/A'}
+   - Click the link above to view this analysis on the DKG blockchain
+💰 **Auto-Stake:** ${wf.stakeId || 'N/A'} (1 TRAC)
+⏱️ **Execution Time:** ${wf.executionTime || 0}ms
+
+🔄 **Complete Workflow Executed:**
+   1. AI-powered health claim analysis
+   2. DKG Knowledge Asset publishing
+   3. Community note creation
+   4. Automatic TRAC token staking
+   5. Consensus-based reward distribution (when threshold reached)
+
+📊 **Analysis Results:**
+   - Claim: "${data.claim || 'N/A'}"
+   - Status: Published and staked
+   - Consensus: Building... (minimum 3 stakes required)
+
+🎯 **Next Steps:**
+   - Other agents can stake on this note for consensus
+   - Once consensus is reached, rewards will be distributed automatically
+   - Premium access available via x402 micropayments`;
+  } else if (data.analysisType === 'basic' && data.analysis) {
+    const analysis = data.analysis;
+    return `🩺 **Health Claim Analysis**
+
+**Claim:** ${data.claim || 'N/A'}
+**Verdict:** ${analysis.verdict?.toUpperCase() || 'UNKNOWN'}
+**Confidence:** ${(analysis.confidence * 100).toFixed(1)}%
+
+**Summary:** ${analysis.summary || 'N/A'}
+
+**Sources:** ${analysis.sources?.join(', ') || 'N/A'}
+
+**Claim ID:** ${data.claimId || 'N/A'} (save this for publishing)
+
+💎 **Want premium access?** First publish this as a Community Note, then pay 1 TRAC for enhanced analysis with expert commentary, medical citations, statistical data, and bias assessment.
+
+Let me know if you'd like me to publish this note!`;
+  }
+
+  // Fallback to formatted JSON
+  return JSON.stringify(data, null, 2);
+}
+
 export default function ChatMessageToolCall({
   title,
   description,
@@ -136,12 +194,81 @@ export default function ChatMessageToolCall({
               <View style={styles.codeBlock}>
                 {status === "success" && (
                   <Text style={styles.codeText}>
-                    {JSON.stringify(output, null, 2)}
+                    {(() => {
+                      try {
+                        // Handle different output formats safely
+                        if (Array.isArray(output)) {
+                          // If it's an array of content objects, extract text content
+                          const textContents = output
+                            .filter((item: any) => item && typeof item === 'object' && item.type === 'text' && item.text)
+                            .map((item: any) => item.text)
+                            .join('\n\n');
+                          return textContents || JSON.stringify(output, null, 2);
+                        } else if (output && typeof output === 'object' && output.content) {
+                          // If it has a content property (MCP tool result), extract and parse text content
+                          if (Array.isArray(output.content)) {
+                            const textContents = output.content
+                              .filter((item: any) => item && typeof item === 'object' && item.type === 'text' && item.text)
+                              .map((item: any) => {
+                                const text = item.text;
+                                // Try to parse JSON responses and format them nicely
+                                try {
+                                  const parsed = JSON.parse(text);
+                                  if (parsed && typeof parsed === 'object') {
+                                    // Format structured analysis responses
+                                    if (parsed.success && parsed.analysisType) {
+                                      return formatAnalysisResponse(parsed);
+                                    }
+                                    // Return nicely formatted JSON for other objects
+                                    return JSON.stringify(parsed, null, 2);
+                                  }
+                                } catch (e) {
+                                  // Not JSON, return as-is
+                                }
+                                return text;
+                              })
+                              .join('\n\n');
+                            return textContents || JSON.stringify(output.content, null, 2);
+                          } else {
+                            return JSON.stringify(output.content, null, 2);
+                          }
+                        } else {
+                          // For other objects, try to stringify but exclude problematic properties
+                          const safeOutput = { ...output };
+                          // Remove potentially problematic properties that might cause circular refs
+                          delete safeOutput.workflowResult;
+                          delete safeOutput.analysis;
+                          return JSON.stringify(safeOutput, null, 2);
+                        }
+                      } catch (error) {
+                        // If JSON stringify fails, try to extract text content manually
+                        try {
+                          if (output && typeof output === 'object' && output.content) {
+                            if (Array.isArray(output.content)) {
+                              const textContents = output.content
+                                .filter((item: any) => item && typeof item === 'object' && item.type === 'text' && item.text)
+                                .map((item: any) => item.text)
+                                .join('\n\n');
+                              return textContents;
+                            }
+                          }
+                        } catch (innerError) {
+                          // Fall back to string conversion
+                        }
+                        return String(output);
+                      }
+                    })()}
                   </Text>
                 )}
                 {status === "error" && (
                   <Text style={[styles.codeText, { color: colors.error }]}>
-                    {`${output}`}
+                    {(() => {
+                      try {
+                        return typeof output === 'string' ? output : JSON.stringify(output, null, 2);
+                      } catch (error) {
+                        return String(output);
+                      }
+                    })()}
                   </Text>
                 )}
                 {status === "cancelled" && (

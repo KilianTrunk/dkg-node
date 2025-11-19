@@ -22,7 +22,7 @@ if (!fs.existsSync(logsDir)) {
 
 // Create initial log file if it doesn't exist (for tail command)
 const today = new Date().toISOString().split("T")[0];
-const initialLogFile = path.join(logsDir, `health-guardian-${today}.log`);
+const initialLogFile = path.join(logsDir, `medsy-${today}.log`);
 if (!fs.existsSync(initialLogFile)) {
   // Create empty file only if it doesn't exist
   fs.closeSync(fs.openSync(initialLogFile, "w"));
@@ -52,7 +52,7 @@ const logger = winston.createLogger({
     winston.format.splat(),
     customFormat,
   ),
-  defaultMeta: { service: "HealthGuardian" },
+  defaultMeta: { service: "Medsy" },
   transports: [
     // Console transport with colors
     new winston.transports.Console({
@@ -65,7 +65,7 @@ const logger = winston.createLogger({
 
     // Daily rotating file for all logs
     new DailyRotateFile({
-      filename: path.join(logsDir, "health-guardian-%DATE%.log"),
+      filename: path.join(logsDir, "medsy-%DATE%.log"),
       datePattern: "YYYY-MM-DD",
       maxSize: "20m",
       maxFiles: "14d", // Keep logs for 14 days
@@ -77,7 +77,7 @@ const logger = winston.createLogger({
 
     // Separate file for errors
     new DailyRotateFile({
-      filename: path.join(logsDir, "health-guardian-error-%DATE%.log"),
+      filename: path.join(logsDir, "medsy-error-%DATE%.log"),
       datePattern: "YYYY-MM-DD",
       level: "error",
       maxSize: "20m",

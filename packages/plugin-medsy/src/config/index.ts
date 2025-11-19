@@ -7,7 +7,7 @@ import { z } from "zod";
 
 export const MedsyConfigSchema = z.object({
   database: z.object({
-    path: z.string().default("./health-guardian.db"),
+    path: z.string().default("./medsy.db"),
   }),
   ai: z.object({
     provider: z.enum(["openai", "anthropic", "groq", "mistral"]).default("openai"),

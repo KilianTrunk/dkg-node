@@ -10,7 +10,7 @@ import { ConsensusService } from "./ConsensusService";
 const logger = createServiceLogger("WorkflowOrchestrator");
 
 /**
- * Orchestrator for all health guardian workflows
+ * Orchestrator for all medsy workflows
  * Provides a clean interface for executing complex workflows
  */
 export class WorkflowOrchestrator {

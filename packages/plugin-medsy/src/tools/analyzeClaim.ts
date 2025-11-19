@@ -71,7 +71,21 @@ export function registerAnalyzeClaimTool(
         return {
           content: [{
             type: "text",
-            text: `Health Claim Analysis:\n\nClaim: ${claim}\nVerdict: ${analysis.verdict.toUpperCase()}\nConfidence: ${(analysis.confidence * 100).toFixed(1)}%\n\nSummary: ${analysis.summary}\n\nSources: ${analysis.sources.join(", ")}\n\nClaim ID: ${claimId} (save this for publishing)\n\n💎 **Want premium access?** First publish this as a Community Note, then pay 1 TRAC for enhanced analysis with expert commentary, medical citations, statistical data, and bias assessment.\n\nLet me know if you'd like me to publish this note!`
+            text: JSON.stringify({
+              success: true,
+              analysisType: "basic",
+              claim: claim,
+              context: context,
+              analysis: {
+                verdict: analysis.verdict,
+                confidence: analysis.confidence,
+                summary: analysis.summary,
+                sources: analysis.sources
+              },
+              claimId: claimId,
+              status: "analyzed",
+              message: "Basic health claim analysis completed. Ready for publishing as community note."
+            })
           }],
           claimId,
           analysis
