@@ -71,7 +71,7 @@ The Medsy plugin creates a **production-ready decentralized health misinformatio
 - **AI Analysis Caching**: 1-hour TTL prevents redundant LLM calls
 - **Parallel Processing**: Database operations run concurrently with AI analysis
 - **Progress Reporting**: 5-second intervals keep MCP connections alive
-- **Environment Tuning**: `HG_TIMEOUT_*` variables for production optimization
+- **Environment Tuning**: `MEDSY_*` variables for production optimization
 
 ### 🤖 Autonomous Agent Workflows
 
@@ -104,7 +104,7 @@ Implements **hackathon requirement** for accurate AI agent rewards:
 ### Service Architecture
 
 ```
-HealthGuardianPlugin
+MedsyPlugin
 ├── ServiceContainer (Dependency Injection)
 ├── AIAnalysisService (LLM Integration)
 ├── DkgService (DKG Publishing)
@@ -118,26 +118,32 @@ HealthGuardianPlugin
 
 ### 1. Environment Configuration
 
-Create `.env.health-guardian` in the plugin root:
+Create `.env.medsy` in the plugin root:
 
 ```bash
-# Database
-HG_DATABASE_PATH="./health-guardian.db"
+# Database Configuration
+MEDSY_DATABASE_PATH="./medsy.db"
 
-# AI Configuration
-HG_AI_PROVIDER="openai"
-HG_AI_MODEL="gpt-4"
-HG_AI_TEMPERATURE="0.7"
-HG_AI_MAX_TOKENS="4000"
+# AI Configuration (multiple providers supported)
+MEDSY_AI_PROVIDER="groq"
+MEDSY_AI_MODEL="mixtral-8x7b-32768"
+MEDSY_AI_TEMPERATURE="0.7"
+MEDSY_AI_MAX_TOKENS="4000"
 
-# DKG Configuration
-HG_DKG_ENDPOINT="https://your-dkg-node.com"
-HG_DKG_BLOCKCHAIN="otp"
+# DKG Configuration (inherits from main agent config)
+MEDSY_DKG_ENDPOINT="http://localhost:8900"
+MEDSY_DKG_BLOCKCHAIN="otp:20430"
 
-# Tokenomics
-HG_TRAC_TOKEN_ADDRESS="0x..."
+# Tokenomics Configuration (TRAC token on OriginTrail)
+MEDSY_TRAC_TOKEN_ADDRESS="0xFfFFFFff00000000000000000000000000000001"
+MEDSY_REWARD_MULTIPLIER="1.0"
 
-# Logging
+# Payment Configuration (x402 Micropayments)
+MEDSY_PAYMENT_ENABLED="true"
+MEDSY_STABLECOIN_ADDRESS="0xA0b86a33E6441e88C5F2712C3E9b74F5b6c6C6b7"
+MEDSY_MICROPAYMENT_THRESHOLD="0.01"
+
+# Logging Configuration
 LOG_LEVEL="info"
 ```
 
@@ -378,83 +384,70 @@ agent_rewards (
 #### Core Configuration
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `HG_DATABASE_PATH` | SQLite database path | `./health-guardian.db` |
+| `MEDSY_DATABASE_PATH` | SQLite database path | `./medsy.db` |
 | `LOG_LEVEL` | Logging level (error/warn/info/debug) | `info` |
-| `HG_PERFORMANCE_MODE` | Performance mode (fast/balanced/reliable) | `balanced` |
 
 #### AI Configuration
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `HG_AI_PROVIDER` | AI provider (openai/anthropic/groq/mistral) | `openai` |
-| `HG_AI_MODEL` | Specific model to use | Provider default |
-| `HG_AI_TEMPERATURE` | Response creativity (0.0-1.0) | `0.7` |
-| `HG_AI_MAX_TOKENS` | Maximum response length | `4000` |
+| `MEDSY_AI_PROVIDER` | AI provider (openai/anthropic/groq/mistral) | `groq` |
+| `MEDSY_AI_MODEL` | Specific model to use | `mixtral-8x7b-32768` |
+| `MEDSY_AI_TEMPERATURE` | Response creativity (0.0-1.0) | `0.7` |
+| `MEDSY_AI_MAX_TOKENS` | Maximum response length | `4000` |
 
 #### DKG Configuration
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `HG_DKG_BLOCKCHAIN` | Blockchain network (otp/polkadot) | `otp` |
-| `HG_DKG_EPOCHS_NUM` | Publishing epochs (reduced for speed) | `3` |
-| `HG_DKG_MIN_CONFIRMATIONS` | Minimum confirmations | `1` |
-| `HG_DKG_MIN_REPLICATIONS` | Minimum replications | `1` |
+| `MEDSY_DKG_ENDPOINT` | DKG node endpoint | `http://localhost:8900` |
+| `MEDSY_DKG_BLOCKCHAIN` | Blockchain network with ID | `otp:20430` |
 
 #### Tokenomics Configuration
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `HG_TRAC_TOKEN_ADDRESS` | TRAC token contract address | - |
-| `HG_NEURO_TOKEN_ADDRESS` | NEURO token contract address | - |
-| `HG_MINIMUM_STAKE` | Minimum TRAC stake amount | `1.0` |
-| `HG_REWARD_MULTIPLIER` | Agent reward multiplier | `1.0` |
-
-#### Performance Tuning (MCP Timeout Prevention)
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `HG_TIMEOUT_AI_ANALYSIS` | AI analysis timeout (ms) | `60000` |
-| `HG_TIMEOUT_DKG_PUBLISH` | DKG publishing timeout (ms) | `90000` |
-| `HG_TIMEOUT_TOKEN_STAKE` | Token staking timeout (ms) | `60000` |
-| `HG_TIMEOUT_TOTAL_WORKFLOW` | Total workflow timeout (ms) | `240000` |
+| `MEDSY_TRAC_TOKEN_ADDRESS` | TRAC token contract address | `0xFfFFFFff00000000000000000000000000000001` |
+| `MEDSY_REWARD_MULTIPLIER` | Agent reward multiplier | `1.0` |
+| `MEDSY_MINIMUM_STAKE` | Minimum TRAC stake amount | `1.0` |
 
 #### Payment Configuration
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `HG_PAYMENT_ENABLED` | Enable x402 payments | `false` |
-| `HG_STABLECOIN_ADDRESS` | Stablecoin contract address | - |
-| `HG_MICROPAYMENT_THRESHOLD` | Micropayment threshold | `0.01` |
+| `MEDSY_PAYMENT_ENABLED` | Enable x402 payments | `true` |
+| `MEDSY_STABLECOIN_ADDRESS` | Stablecoin contract address | `0xA0b86a33E6441e88C5F2712C3E9b74F5b6c6C6b7` |
+| `MEDSY_MICROPAYMENT_THRESHOLD` | Micropayment threshold | `0.01` |
 
-### Example `.env.health-guardian` Configuration
+### Example `.env.medsy` Configuration
 
 ```bash
-# Core Configuration
-HG_DATABASE_PATH="./health-guardian.db"
+# Database Configuration
+MEDSY_DATABASE_PATH="./medsy.db"
+
+# AI Configuration (multiple providers supported)
+MEDSY_AI_PROVIDER="groq"
+MEDSY_AI_MODEL="mixtral-8x7b-32768"
+MEDSY_AI_TEMPERATURE="0.7"
+MEDSY_AI_MAX_TOKENS="4000"
+
+# DKG Configuration (inherits from main agent config)
+MEDSY_DKG_ENDPOINT="http://localhost:8900"
+MEDSY_DKG_BLOCKCHAIN="otp:20430"
+
+# Tokenomics Configuration (TRAC token on OriginTrail)
+MEDSY_TRAC_TOKEN_ADDRESS="0xFfFFFFff00000000000000000000000000000001"
+MEDSY_REWARD_MULTIPLIER="1.0"
+
+# Payment Configuration (x402 Micropayments)
+MEDSY_PAYMENT_ENABLED="true"
+MEDSY_STABLECOIN_ADDRESS="0xA0b86a33E6441e88C5F2712C3E9b74F5b6c6C6b7"
+MEDSY_MICROPAYMENT_THRESHOLD="0.01"
+
+# Logging Configuration
 LOG_LEVEL="info"
-HG_PERFORMANCE_MODE="balanced"
 
-# AI Configuration
-HG_AI_PROVIDER="openai"
-HG_AI_MODEL="gpt-4"
-HG_AI_TEMPERATURE="0.7"
-HG_AI_MAX_TOKENS="4000"
+# Optional: x402 Payment Gateway URL (leave unset for mock payments)
+X402_PAYMENT_GATEWAY="https://x402.example.com"
 
-# DKG Configuration (NeuroWeb Testnet)
-HG_DKG_BLOCKCHAIN="otp"
-HG_DKG_EPOCHS_NUM="3"
-
-# Tokenomics (Real TRAC on Testnet)
-HG_TRAC_TOKEN_ADDRESS="0x..."
-HG_NEURO_TOKEN_ADDRESS="0x..."
-HG_MINIMUM_STAKE="1.0"
-HG_REWARD_MULTIPLIER="1.0"
-
-# Performance Tuning (Prevents MCP -32001 timeouts)
-HG_TIMEOUT_AI_ANALYSIS="60000"
-HG_TIMEOUT_DKG_PUBLISH="90000"
-HG_TIMEOUT_TOKEN_STAKE="60000"
-HG_TIMEOUT_TOTAL_WORKFLOW="240000"
-
-# Premium Payments
-HG_PAYMENT_ENABLED="true"
-HG_STABLECOIN_ADDRESS="0x..."
-HG_MICROPAYMENT_THRESHOLD="0.01"
+# Optional: App URL for payment callbacks
+APP_URL="http://localhost:9200"
 ```
 
 ## 🚀 Production Deployment & Recent Improvements
@@ -484,8 +477,8 @@ HG_MICROPAYMENT_THRESHOLD="0.01"
 ```bash
 # 1. Install and configure
 npm install
-cp .env.health-guardian.example .env.health-guardian
-# Add your TRAC token contract address
+cp .env.medsy .env.medsy.example  # Copy the example config
+# Edit .env.medsy with your settings
 
 # 2. Setup database
 npm run db:migrate
@@ -558,7 +551,7 @@ npm run lint         # ESLint checks
 npm run test
 
 # Run specific test file
-npm run test -- tests/plugin-health-guardian.spec.ts
+npm run test -- tests/plugin-medsy.spec.ts
 ```
 
 ## Monitoring & Metrics
