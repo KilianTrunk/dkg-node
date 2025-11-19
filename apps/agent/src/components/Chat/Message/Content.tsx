@@ -1,14 +1,47 @@
+import React from "react";
 import { View } from "react-native";
 import { Image, useImage } from "expo-image";
 import type { MessageContentComplex } from "@langchain/core/messages";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  withDelay,
+  Easing,
+} from "react-native-reanimated";
 
 import Markdown from "@/components/Markdown";
 import { FileDefinition } from "@/shared/files";
 
 import AttachmentChip from "../Input/AttachmentChip";
 
-function TextContent(props: { text: string }) {
-  return <Markdown testID="chat-message-text">{props.text}</Markdown>;
+function TextContent(props: { text: string; isMedsy?: boolean }) {
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(10);
+
+  React.useEffect(() => {
+    opacity.value = withDelay(100, withTiming(1, { duration: 300, easing: Easing.out(Easing.ease) }));
+    translateY.value = withDelay(100, withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) }));
+  }, [props.text]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <Markdown
+        testID="chat-message-text"
+        style={props.isMedsy ? {
+          body: { fontFamily: 'System', lineHeight: 24 },
+          paragraph: { marginBottom: 12 },
+        } : undefined}
+      >
+        {props.text}
+      </Markdown>
+    </Animated.View>
+  );
 }
 
 function ImageContent(props: { url: string; authToken?: string }) {
@@ -44,11 +77,13 @@ function FileContent(props: { file: FileDefinition }) {
 
 export default function ChatMessageContent({
   content: c,
+  isMedsy = false,
 }: {
   content: MessageContentComplex;
+  isMedsy?: boolean;
 }) {
   if (c.type === "text" && c.text) {
-    return <TextContent text={c.text} />;
+    return <TextContent text={c.text} isMedsy={isMedsy} />;
   }
   if (c.type === "image_url") {
     return <ImageContent url={c.image_url?.url ?? c.image_url} />;

@@ -1,5 +1,12 @@
 import { router, Href } from "expo-router";
 import { View, Text, StyleProp, ViewStyle, Pressable } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  interpolate,
+  Extrapolation,
+} from "react-native-reanimated";
 
 import type { PropsWithChildren, ReactNode } from "react";
 import type { SvgProps } from "react-native-svg";
@@ -13,12 +20,35 @@ function HeaderNavLink(props: {
   onPress?: () => void;
 }) {
   const cardTextColor = useThemeColor("cardText");
+  const primaryColor = useThemeColor("primary");
+
+  // Hover animation state
+  const hoverValue = useSharedValue(0);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        scale: interpolate(hoverValue.value, [0, 1], [1, 1.05], Extrapolation.CLAMP),
+      },
+    ],
+  }));
+
+  const textAnimatedStyle = useAnimatedStyle(() => ({
+    color: hoverValue.value > 0 ? primaryColor : cardTextColor,
+  }));
 
   return (
+    <Animated.View style={animatedStyle}>
     <Pressable
       onPress={() =>
         props.href ? router.navigate(props.href) : props.onPress?.()
       }
+        onHoverIn={() => {
+          hoverValue.value = withTiming(1, { duration: 200 });
+        }}
+        onHoverOut={() => {
+          hoverValue.value = withTiming(0, { duration: 200 });
+        }}
       style={{
         display: "flex",
         flexDirection: "row",
@@ -26,23 +56,29 @@ function HeaderNavLink(props: {
         gap: 5,
         cursor: "pointer",
         userSelect: "none",
+          paddingVertical: 8,
+          paddingHorizontal: 12,
+          borderRadius: 8,
       }}
     >
       {props.icon && (
         <props.icon height={18} width={18} stroke={cardTextColor} />
       )}
-      <Text
-        style={{
-          color: cardTextColor,
+        <Animated.Text
+          style={[
+            textAnimatedStyle,
+            {
           fontFamily: "Manrope_600SemiBold",
           fontWeight: "600",
           fontSize: 16,
           lineHeight: 24,
-        }}
+            },
+          ]}
       >
         {props.text}
-      </Text>
+        </Animated.Text>
     </Pressable>
+    </Animated.View>
   );
 }
 

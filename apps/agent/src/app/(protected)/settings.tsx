@@ -9,6 +9,15 @@ import {
 import { Collapsible } from "react-native-fast-collapsible";
 import { fetch } from "expo/fetch";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  withDelay,
+  withSpring,
+  runOnJS,
+} from "react-native-reanimated";
 
 import { useMcpClient } from "@/client";
 import { toError } from "@/shared/errors";
@@ -27,8 +36,9 @@ import ProfileDetailsForm from "@/components/forms/ProfileDetailsForm";
 
 const sections = [
   {
-    title: "Profile & account details",
-    description: "Manage your profile and account settings.",
+    title: "Patient Profile",
+    description: "Manage your personal health information, medical history, and care preferences.",
+    icon: "person-circle",
     Component: () => {
       const { showAlert } = useAlerts();
       const { showDialog } = useDialog();
@@ -105,7 +115,8 @@ const sections = [
   },
   {
     title: "Security",
-    description: "Change your password and secure your account.",
+    description: "Protect your PHI with enterprise-grade encryption, access controls, and compliance measures.",
+    icon: "shield-checkmark",
     Component: () => {
       const { showAlert } = useAlerts();
       const { showDialog } = useDialog();
@@ -168,8 +179,9 @@ const sections = [
     },
   },
   {
-    title: "Tools & plugins",
-    description: "Manage MCP tools, permissions, and auto-approval.",
+    title: "AI Tools",
+    description: "Configure evidence-based AI diagnostics, treatment recommendations, and health monitoring tools.",
+    icon: "medical",
     Component: () => {
       const settings = useSettings();
       const { showAlert } = useAlerts();
@@ -210,51 +222,133 @@ const sections = [
 export default function SettingsPage() {
   const mcp = useMcpClient();
   const colors = useColors();
-  const { width } = usePlatform();
+  const { width, size } = usePlatform();
   const [activeIndex, setActiveIndex] = useState(0);
   const ActiveContent = sections[activeIndex]?.Component || (() => null);
 
+  // Smooth fade-in animations for better UX
+  const headerOpacity = useSharedValue(0);
+  const contentOpacity = useSharedValue(0);
+  const sectionTransitionOpacity = useSharedValue(1);
+  const sectionTransitionScale = useSharedValue(1);
+
+  useEffect(() => {
+    // Staggered fade-in animations
+    headerOpacity.value = withDelay(100, withTiming(1, { duration: 500 }));
+    contentOpacity.value = withDelay(300, withTiming(1, { duration: 500 }));
+  }, []);
+
+  // Light transition animation when switching sections
+  const animateSectionChange = (newIndex: number) => {
+    'worklet';
+    sectionTransitionOpacity.value = withTiming(0, { duration: 150 }, () => {
+      runOnJS(setActiveIndex)(newIndex);
+      sectionTransitionOpacity.value = withTiming(1, { duration: 200 });
+    });
+    sectionTransitionScale.value = withSpring(0.98, { damping: 20, stiffness: 300 }, () => {
+      sectionTransitionScale.value = withSpring(1, { damping: 15, stiffness: 200 });
+    });
+  };
+
+  const headerStyle = useAnimatedStyle(() => ({
+    opacity: headerOpacity.value,
+  }));
+
+  const contentStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
+  }));
+
+  const sectionTransitionStyle = useAnimatedStyle(() => ({
+    opacity: sectionTransitionOpacity.value,
+    transform: [{ scale: sectionTransitionScale.value }],
+  }));
+
   return (
     <Page>
+      {/* Logo-themed background */}
+      <LinearGradient
+        colors={['rgba(255, 153, 153, 0.08)', 'rgba(69, 80, 91, 0.05)', 'rgba(255, 254, 254, 0.03)']}
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+        }}
+      />
+
+
       <Container>
         <Header handleLogout={mcp.disconnect} />
-        {width > 834 ? (
-          <View
-            style={{
-              flex: 1,
-              flexDirection: "row",
-              gap: 16,
-              paddingVertical: 48,
-            }}
-          >
+
+        <Animated.View style={[{
+          flex: 1
+        }, contentStyle]}>
+          {size.w.lg ? (
+          <View style={{
+            flex: 1,
+            flexDirection: "row",
+            gap: 32,
+            paddingVertical: 64,
+            alignItems: "flex-start",
+          }}>
             <View style={{ flex: 1, gap: 16 }}>
               {sections.map((section, index) => (
                 <TouchableOpacity
-                  onPress={() => setActiveIndex(index)}
+                  onPress={() => animateSectionChange(index)}
                   disabled={index === activeIndex}
                   key={index}
                   style={[
                     styles.card,
-                    { backgroundColor: colors.card },
+                    {
+                      backgroundColor: colors.card,
+                      borderRadius: 16,
+                      padding: 20,
+                      shadowColor: colors.primary,
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 8,
+                      elevation: 3,
+                    },
                     index === activeIndex && {
                       backgroundColor: colors.primary,
+                      borderLeftWidth: 4,
+                      borderLeftColor: colors.primary,
                     },
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.sectionTitle,
-                      { color: colors.text },
-                      index === activeIndex && { color: colors.primaryText },
-                    ]}
-                  >
-                    {section.title}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                    <Ionicons
+                      name={section.icon as any}
+                      size={24}
+                      color={index === activeIndex ? colors.primaryText : colors.primary}
+                      style={{ marginRight: 12 }}
+                    />
+                    <Text
+                      style={[
+                        styles.sectionTitle,
+                        {
+                          color: colors.text,
+                          fontSize: 18,
+                          fontWeight: "600",
+                          fontFamily: "SpaceGrotesk_600SemiBold"
+                        },
+                        index === activeIndex && { color: colors.primaryText },
+                      ]}
+                    >
+                      {section.title}
+                    </Text>
+                  </View>
                   <Text
                     style={[
                       styles.sectionDescription,
-                      { color: colors.text },
-                      index === activeIndex && { color: colors.primaryText },
+                      {
+                        color: colors.text,
+                        opacity: 0.7,
+                        lineHeight: 20,
+                        fontSize: 14
+                      },
+                      index === activeIndex && { color: colors.primaryText, opacity: 0.9 },
                     ]}
                   >
                     {section.description}
@@ -263,73 +357,114 @@ export default function SettingsPage() {
               ))}
             </View>
 
-            <View style={{ flex: 1 }}>
+            <Animated.View style={[{ flex: 1 }, sectionTransitionStyle]}>
               <View
                 style={[
                   styles.card,
-                  { backgroundColor: colors.card, width: "100%" },
+                  {
+                    backgroundColor: colors.card,
+                    width: "100%",
+                    borderRadius: 16,
+                    padding: 24,
+                    shadowColor: colors.primary,
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 8,
+                    elevation: 3,
+                  },
                 ]}
               >
                 <ActiveContent />
               </View>
-            </View>
+            </Animated.View>
           </View>
         ) : (
-          <ScrollView style={{ flex: 1, paddingVertical: 48 }}>
-            {sections.map((section, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.card,
-                  { backgroundColor: colors.card, marginBottom: 16 },
-                ]}
-              >
-                <TouchableOpacity
-                  onPress={() =>
-                    setActiveIndex((currentIndex) =>
-                      currentIndex === index ? -1 : index,
-                    )
-                  }
-                  style={{ flexDirection: "row" }}
+          <View style={{ flex: 1 }}>
+            <ScrollView
+              style={{
+                flex: 1,
+                paddingVertical: size.w.sm ? 16 : 32,
+                paddingHorizontal: size.w.sm ? 8 : 16
+              }}
+              contentContainerStyle={{
+                paddingBottom: 32,
+              }}
+            >
+              {sections.map((section, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.card,
+                    {
+                      backgroundColor: colors.card,
+                      marginBottom: size.w.sm ? 16 : 24,
+                      borderRadius: 16,
+                      shadowColor: colors.primary,
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 8,
+                      elevation: 3,
+                      marginHorizontal: size.w.sm ? 8 : 16,
+                    },
+                  ]}
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                      {section.title}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.sectionDescription,
-                        { color: colors.text },
-                        index === activeIndex && { color: colors.primaryText },
-                      ]}
-                    >
+                  <TouchableOpacity
+                    onPress={() =>
+                      setActiveIndex((currentIndex) =>
+                        currentIndex === index ? -1 : index,
+                      )
+                    }
+                    style={{ padding: 20 }}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                      <Ionicons
+                        name={section.icon as any}
+                        size={24}
+                        color={colors.primary}
+                        style={{ marginRight: 12 }}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[
+                          styles.sectionTitle,
+                          {
+                            color: colors.text,
+                            fontSize: 18,
+                            fontWeight: "600",
+                            fontFamily: "SpaceGrotesk_600SemiBold"
+                          }
+                        ]}>
+                          {section.title}
+                        </Text>
+                      </View>
+                      <Ionicons
+                        name={index === activeIndex ? "chevron-up" : "chevron-down"}
+                        size={20}
+                        color={colors.text}
+                        style={{ opacity: 0.5 }}
+                      />
+                    </View>
+                    <Text style={[
+                      styles.sectionDescription,
+                      {
+                        color: colors.text,
+                        opacity: 0.7,
+                        lineHeight: 20,
+                        fontSize: 14
+                      }
+                    ]}>
                       {section.description}
                     </Text>
-                  </View>
-                  <View
-                    style={{
-                      width: 40,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Ionicons
-                      name={
-                        index === activeIndex ? "chevron-up" : "chevron-down"
-                      }
-                      size={24}
-                      color={colors.text}
-                    />
-                  </View>
-                </TouchableOpacity>
-                <Collapsible isVisible={index === activeIndex}>
-                  <View style={{ height: 32 }} />
-                  <section.Component />
-                </Collapsible>
-              </View>
+                  </TouchableOpacity>
+                  <Collapsible isVisible={index === activeIndex}>
+                    <View style={{ height: 32 }} />
+                    <section.Component />
+                  </Collapsible>
+                </View>
             ))}
           </ScrollView>
+          </View>
         )}
+        </Animated.View>
         <Footer />
       </Container>
     </Page>

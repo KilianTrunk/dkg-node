@@ -1,6 +1,8 @@
+import React from "react";
 import Svg, {
   SvgProps,
   Path,
+  Circle,
   Defs,
   LinearGradient,
   Stop,
@@ -8,29 +10,62 @@ import Svg, {
 
 import useColors from "@/hooks/useColors";
 
-export default function ChatMessageIconAssistant(props: SvgProps) {
+export type AssistantState = 'idle' | 'thinking' | 'speaking' | 'processing';
+
+interface MedsyAssistantIconProps extends SvgProps {
+  state?: AssistantState;
+}
+
+export default function ChatMessageIconAssistant({
+  state = 'idle',
+  ...props
+}: MedsyAssistantIconProps) {
   const colors = useColors();
 
   return (
-    <Svg width={32} height={32} fill="none" {...props}>
-      <Path
-        fill="url(#a)"
-        fillRule="evenodd"
-        d="M16 7.958a8.042 8.042 0 1 0 6.152 13.22l6.088 5.125A15.965 15.965 0 0 1 16 32C7.163 32 0 24.836 0 16 0 7.163 7.163 0 16 0v7.958Zm13.825 16.099-6.877-4.008c.235-.401.436-.825.6-1.267l7.469 2.753c-.325.88-.725 1.723-1.192 2.522ZM24.041 16H32c0-.948-.083-1.876-.241-2.779l-7.839 1.382c.08.454.121.92.121 1.397ZM28.3 5.766l-6.117 5.09a8.09 8.09 0 0 0-.987-.995l5.14-6.074c.71.602 1.368 1.264 1.964 1.98Z"
-        clipRule="evenodd"
-      />
+    <Svg width={32} height={32} viewBox="0 0 32 32" {...props}>
       <Defs>
-        <LinearGradient
-          id="a"
-          x1={7.037}
-          x2={23.47}
-          y1={-0.14}
-          y2={33.473}
-          gradientUnits="userSpaceOnUse"
-        >
-          <Stop stopColor={colors.primary} />
-          <Stop offset={1} stopColor={colors.secondary} />
+        {/* Medsy gradient for the main circle */}
+        <LinearGradient id="medsyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <Stop offset="0%" stopColor="#FF9999" />
+          <Stop offset="100%" stopColor="#E57373" />
         </LinearGradient>
+      </Defs>
+
+      {/* Medical Cross Symbol */}
+      <Circle
+        cx={16}
+        cy={16}
+        r={14}
+        fill="url(#medsyGradient)"
+        stroke={colors.primary}
+        strokeWidth={1.5}
+      />
+
+      {/* Medical Cross */}
+      <Path
+        d="M12 16h8M16 12v8"
+        stroke="white"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {/* State indicator dot - only show during active processing */}
+      {(state === 'speaking' || state === 'processing') && (
+        <Circle
+          cx={22}
+          cy={8}
+          r={3}
+          fill={
+            state === 'speaking' ? '#10B981' : // Green for speaking
+            state === 'processing' ? '#FF9999' : 'transparent' // Pink for processing (matches theme)
+          }
+          opacity={0.9}
+        />
+      )}
+
+      <Defs>
       </Defs>
     </Svg>
   );

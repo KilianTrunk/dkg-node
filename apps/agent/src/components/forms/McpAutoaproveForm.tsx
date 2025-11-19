@@ -48,7 +48,7 @@ export default function McpAutoapproveForm({
           marginBottom: 8,
         }}
       >
-        Allow DKG Agent to run MCP tools automatically without requiring user
+        Allow Medsy Health AI to run clinical analysis tools automatically without requiring user
         confirmation.
       </Text>
       <Button

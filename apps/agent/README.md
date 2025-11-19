@@ -1,4 +1,4 @@
-# DKG Agent app
+# Medsy Health AI App
 
 ## Get started
 

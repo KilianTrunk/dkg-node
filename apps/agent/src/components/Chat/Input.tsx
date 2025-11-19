@@ -1,4 +1,4 @@
-import { ComponentProps, useCallback, useState } from "react";
+import { ComponentProps, useCallback, useState, useRef, useEffect } from "react";
 import {
   View,
   TextInput,
@@ -6,6 +6,15 @@ import {
   ViewStyle,
   StyleSheet,
 } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  withSpring,
+  interpolate,
+  Extrapolation,
+  Easing,
+} from "react-native-reanimated";
 import * as DocumentPicker from "expo-document-picker";
 
 import Button from "@/components/Button";
@@ -15,6 +24,7 @@ import MicrophoneIcon from "@/components/icons/MicrophoneIcon";
 import AttachFileIcon from "@/components/icons/AttachFileIcon";
 import ToolsIcon from "@/components/icons/ToolsIcon";
 import useColors from "@/hooks/useColors";
+import usePlatform from "@/hooks/usePlatform";
 import { ChatMessage, toContents } from "@/shared/chat";
 import { toError } from "@/shared/errors";
 import { FileDefinition } from "@/shared/files";
@@ -62,9 +72,120 @@ export default function ChatInput({
   style?: StyleProp<ViewStyle>;
 } & ComponentProps<typeof ChatInputToolsSelector>) {
   const colors = useColors();
+  const { isWeb } = usePlatform();
   const [message, setMessage] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<FileDefinition[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const inputRef = useRef<any>(null);
+
+  // Animation states
+  const focusValue = useSharedValue(0);
+  const hoverValue = useSharedValue(0);
+  const typingValue = useSharedValue(0);
+
+  // Animated styles
+  const inputContainerStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        scale: interpolate(
+          focusValue.value,
+          [0, 1],
+          [1, 1.02],
+          Extrapolation.CLAMP
+        ),
+      },
+    ],
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: interpolate(
+      focusValue.value + hoverValue.value,
+      [0, 2],
+      [0, 0.25],
+      Extrapolation.CLAMP
+    ),
+    shadowRadius: interpolate(
+      focusValue.value + hoverValue.value,
+      [0, 2],
+      [0, 12],
+      Extrapolation.CLAMP
+    ),
+    elevation: interpolate(
+      focusValue.value + hoverValue.value,
+      [0, 2],
+      [0, 6],
+      Extrapolation.CLAMP
+    ),
+  }));
+
+  const inputStyle = useAnimatedStyle(() => ({
+    borderWidth: 2,
+    borderColor: colors.primary,
+    backgroundColor: focusValue.value > 0 ? 'rgba(255, 153, 153, 0.12)' : 'rgba(255, 153, 153, 0.08)',
+  }));
+
+  // Apply web-specific styles to remove browser defaults
+  useEffect(() => {
+    if (isWeb && inputRef.current) {
+      // Get the underlying DOM element
+      const inputElement = (inputRef.current as any)._nativeTag ||
+                          (inputRef.current as any).getNativeScrollRef?.() ||
+                          inputRef.current;
+
+      if (inputElement && typeof document !== 'undefined') {
+        // Use setTimeout to ensure DOM is ready
+        setTimeout(() => {
+          // Find the actual input element in the DOM
+          const domElement = document.querySelector('input') as HTMLInputElement;
+          if (domElement) {
+            // Apply styles directly to override RN Web defaults
+            domElement.style.setProperty('background-color', 'rgba(255, 153, 153, 0.08)', 'important');
+            domElement.style.setProperty('-webkit-appearance', 'none', 'important');
+            domElement.style.setProperty('-moz-appearance', 'textfield', 'important');
+            domElement.style.setProperty('appearance', 'none', 'important');
+            domElement.style.setProperty('border', '2px solid #FF9999', 'important');
+            domElement.style.setProperty('box-shadow', 'none', 'important');
+            domElement.style.setProperty('outline', 'none', 'important');
+
+            // Handle focus/blur events
+            const handleFocus = () => {
+              domElement.style.setProperty('background-color', 'rgba(255, 153, 153, 0.12)', 'important');
+            };
+            const handleBlur = () => {
+              domElement.style.setProperty('background-color', 'rgba(255, 153, 153, 0.08)', 'important');
+            };
+
+            domElement.addEventListener('focus', handleFocus);
+            domElement.addEventListener('blur', handleBlur);
+
+            // Also add global CSS to catch any other inputs
+            const existingStyle = document.getElementById('medsy-input-styles');
+            if (!existingStyle) {
+              const style = document.createElement('style');
+              style.id = 'medsy-input-styles';
+              style.textContent = `
+                input {
+                  background-color: rgba(255, 153, 153, 0.08) !important;
+                  -webkit-appearance: none !important;
+                  -moz-appearance: textfield !important;
+                  appearance: none !important;
+                  border: 2px solid #FF9999 !important;
+                  box-shadow: none !important;
+                  outline: none !important;
+                }
+                input:focus {
+                  background-color: rgba(255, 153, 153, 0.12) !important;
+                }
+                input::selection {
+                  background-color: rgba(255, 153, 153, 0.3) !important;
+                }
+              `;
+              document.head.appendChild(style);
+            }
+          }
+        }, 100);
+      }
+    }
+  }, [isWeb]);
 
   const onSubmit = useCallback(() => {
     onSendMessage({
@@ -92,20 +213,39 @@ export default function ChatInput({
           }}
         />
       )}
-
-      <View style={styles.inputContainer}>
+      <Animated.View style={[styles.inputContainer, inputContainerStyle]}>
         <TextInput
+          ref={inputRef}
           style={[
             styles.input,
-            { backgroundColor: colors.input, color: colors.text },
+            inputStyle,
+            { color: colors.text },
           ]}
           placeholder="Ask anything..."
-          placeholderTextColor={colors.placeholder}
-          onChangeText={setMessage}
+          placeholderTextColor="rgba(255, 153, 153, 0.6)"
+          onChangeText={(text: string) => {
+            setMessage(text);
+            typingValue.value = withSpring(text.length > 0 ? 1 : 0, {
+              damping: 15,
+              stiffness: 100,
+            });
+          }}
           value={message}
           multiline={false}
           testID="chat-input"
-          onKeyPress={({ nativeEvent }) => {
+          onFocus={() => {
+            focusValue.value = withSpring(1, {
+              damping: 20,
+              stiffness: 200,
+            });
+          }}
+          onBlur={() => {
+            focusValue.value = withSpring(0, {
+              damping: 20,
+              stiffness: 200,
+            });
+          }}
+          onKeyPress={({ nativeEvent }: any) => {
             if (nativeEvent.key === "Enter") {
               // Submit on Enter key press
               if (message.trim() && !disabled) {
@@ -132,7 +272,7 @@ export default function ChatInput({
             testID="chat-send-button"
           />
         </View>
-      </View>
+      </Animated.View>
       <View style={styles.inputTools}>
         <Button
           disabled={disabled || isUploading}
@@ -196,6 +336,7 @@ const styles = StyleSheet.create({
     position: "relative",
     height: 56,
     width: "100%",
+    borderRadius: 50,
   },
   input: {
     borderRadius: 50,
