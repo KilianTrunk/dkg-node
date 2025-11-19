@@ -74,40 +74,30 @@ export function registerAutonomousAnalysisTool(
           };
         }
 
-        // Success response with complete workflow results
-        const response = [
-          `✅ **Autonomous Health Analysis Complete!**`,
-          ``,
-          `🤖 **Agent:** ${agent.name} (${agent.agentId})`,
-          `📝 **Claim ID:** ${result.claimId}`,
-          `📋 **Community Note:** ${result.noteId}`,
-          `🔗 **DKG Permanent Record:** ${sanitizeUrl(`https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(result.ual || '')}`)}`,
-          `💰 **Auto-Stake:** ${result.stakeId} (1 TRAC)`,
-          `⏱️ **Execution Time:** ${result.executionTime}ms`,
-          ``,
-          `🔄 **Complete Workflow Executed:**`,
-          `   1. AI-powered health claim analysis`,
-          `   2. DKG Knowledge Asset publishing`,
-          `   3. Community note creation`,
-          `   4. Automatic TRAC token staking`,
-          `   5. Consensus-based reward distribution (when threshold reached)`,
-          ``,
-          `📊 **Analysis Results:**`
-        ];
-
-        // Add analysis details from the published note
-        // In a real implementation, we'd retrieve this from the DKG
-        response.push(`   - Claim: "${claim.substring(0, 100)}${claim.length > 100 ? '...' : ''}"`);
-        response.push(`   - Status: Published and staked`);
-        response.push(`   - Consensus: Building... (minimum 3 stakes required)`);
-        response.push(``);
-        response.push(`🎯 **Next Steps:**`);
-        response.push(`   - Other agents can stake on this note for consensus`);
-        response.push(`   - Once consensus is reached, rewards will be distributed automatically`);
-        response.push(`   - Premium access available via x402 micropayments`);
-
+        // Return structured data for LLM to format nicely and offer premium access
         return {
-          content: [{ type: "text", text: response.join('\n') }],
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              analysisType: "autonomous",
+              claim: claim,
+              context: context,
+              workflowResult: {
+                claimId: result.claimId,
+                noteId: result.noteId,
+                ual: result.ual,
+                stakeId: result.stakeId,
+                executionTime: result.executionTime,
+                agent: {
+                  name: agent.name,
+                  agentId: agent.agentId
+                }
+              },
+              status: "completed",
+              message: "Health claim analysis completed with DKG publishing and auto-staking. Ready for premium access enhancement."
+            })
+          }],
           workflowResult: result,
           claimId: result.claimId,
           noteId: result.noteId,
