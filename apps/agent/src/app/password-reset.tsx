@@ -132,7 +132,7 @@ export default function PasswordResetPage() {
             <View style={{ width: "100%", padding: 15, maxWidth: 450 }}>
               <FormTitle
                 title="Reset your password"
-                subtitle="Enter the email associated with your DKG Node account and we’ll send you a secure link to reset your password."
+                subtitle="Enter the email associated with your Medsy Health AI account and we'll send you a secure link to reset your password."
               />
               <RequestPasswordResetForm onSubmit={sendResetLink} />
             </View>

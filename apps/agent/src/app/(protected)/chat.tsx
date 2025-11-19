@@ -1,9 +1,19 @@
-import { useCallback, useRef, useState } from "react";
-import { View, Platform, KeyboardAvoidingView, ScrollView } from "react-native";
+import React, { useCallback, useRef, useState, useEffect } from "react";
+import { View, Platform, KeyboardAvoidingView, ScrollView, Text } from "react-native";
 import { Image } from "expo-image";
 import * as Clipboard from "expo-clipboard";
 import { fetch } from "expo/fetch";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  withRepeat,
+  withSequence,
+  withDelay,
+  Easing,
+} from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
 //import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   parseSourceKAContent,
@@ -51,6 +61,21 @@ export default function ChatPage() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const chatMessagesRef = useRef<ScrollView>(null);
+
+  const isLandingScreen = !messages.length && !isNativeMobile;
+
+  // Corporate animations - minimal and smooth
+  const landingOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (isLandingScreen) {
+      landingOpacity.value = withDelay(200, withTiming(1, { duration: 600 }));
+    }
+  }, [isLandingScreen]);
+
+  const landingStyle = useAnimatedStyle(() => ({
+    opacity: landingOpacity.value,
+  }));
 
   async function callTool(tc: ToolCall & { id: string }) {
     tools.saveCallInfo(tc.id, { input: tc.args, status: "loading" });
@@ -207,12 +232,24 @@ export default function ChatPage() {
     [mcp, showAlert],
   );
 
-  const isLandingScreen = !messages.length && !isNativeMobile;
   console.debug("Messages:", messages);
   console.debug("Tools (enabled):", tools.enabled);
 
   return (
     <Page style={{ flex: 1, position: "relative", marginBottom: 0 }}>
+      {/* Logo-themed background with gradient */}
+      <LinearGradient
+        colors={['rgba(255, 153, 153, 0.06)', 'rgba(69, 80, 91, 0.04)', 'rgba(255, 254, 254, 0.02)']}
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+        }}
+      />
+
+
       <Chat>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -282,10 +319,24 @@ export default function ChatPage() {
                 const isLastMessage = i === messages.length - 1;
                 const isIdle = !isGenerating && !m.tool_calls?.length;
 
+                const isMedsyMessage = m.role === "assistant";
+
+                // Determine assistant state for animations
+                let assistantState: 'idle' | 'thinking' | 'speaking' | 'processing' = 'idle';
+                if (isMedsyMessage) {
+                  if (isLastMessage && isGenerating) {
+                    assistantState = m.tool_calls?.length ? 'processing' : 'speaking';
+                  } else if (!isLastMessage && !isIdle) {
+                    assistantState = 'thinking';
+                  }
+                }
+
                 return (
                   <Chat.Message
                     key={i}
                     icon={m.role as "user" | "assistant"}
+                    isMedsy={isMedsyMessage}
+                    assistantState={assistantState}
                     style={{ gap: 8 }}
                   >
                     {/* Source Knowledge Assets */}
@@ -310,6 +361,7 @@ export default function ChatPage() {
                       <Chat.Message.Content.Text
                         key={i}
                         text={c.replaceAll(/<think>.*?<\/think>/gs, "")}
+                        isMedsy={isMedsyMessage}
                       />
                     ))}
 
@@ -373,7 +425,9 @@ export default function ChatPage() {
           <View
             style={[
               { width: "100%" },
-              isLandingScreen && { marginTop: 60 },
+              isLandingScreen && {
+                marginTop: isNativeMobile ? 24 : 120, // Less space on mobile since we reduced landing screen margin
+              },
               isNativeMobile && {
                 backgroundColor: colors.backgroundFlat,
                 paddingBottom: safeAreaInsets.bottom,
@@ -389,13 +443,82 @@ export default function ChatPage() {
                 justifyContent: "center",
               }}
             >
-              {isLandingScreen && (
-                <Image
-                  source={require("@/assets/logo.svg")}
-                  style={{ width: 100, height: 100, marginBottom: 24 }}
-                  testID="app-logo"
-                />
-              )}
+    {isLandingScreen && (
+      <Animated.View
+        style={[{
+          alignItems: "center",
+          marginBottom: isNativeMobile ? 16 : 32, // Less margin on mobile
+        }, landingStyle]}
+      >
+
+        <Animated.View
+          style={[{
+            alignItems: "center",
+            marginBottom: 20,
+          }, landingStyle]}
+        >
+          <Text style={{
+            fontSize: isNativeMobile ? 28 : 36, // Smaller title on mobile
+            fontWeight: "700",
+            color: colors.primary,
+            marginBottom: isNativeMobile ? 12 : 16, // Less margin on mobile
+            fontFamily: "SpaceGrotesk_700Bold",
+            textAlign: "center",
+          }}>
+            Medsy Health AI Assistant
+          </Text>
+          <Text style={{
+            fontSize: isNativeMobile ? 18 : 20, // Slightly smaller on mobile
+            color: colors.text,
+            textAlign: "center",
+            lineHeight: isNativeMobile ? 24 : 28, // Tighter line height on mobile
+            paddingHorizontal: isNativeMobile ? 20 : 24, // Less padding on mobile
+            opacity: 0.9,
+            marginBottom: isNativeMobile ? 8 : 12, // Less margin on mobile
+            fontFamily: "Manrope_500Medium",
+          }}>
+            Your Intelligent Healthcare Companion
+          </Text>
+          <Text style={{
+            fontSize: isNativeMobile ? 14 : 16, // Smaller font on mobile
+            color: colors.text,
+            textAlign: "center",
+            lineHeight: isNativeMobile ? 20 : 24, // Tighter line height on mobile
+            paddingHorizontal: isNativeMobile ? 16 : 20, // Less padding on mobile
+            opacity: 0.7,
+            marginBottom: isNativeMobile ? 8 : 12, // Less margin on mobile
+            fontFamily: "Manrope_400Regular",
+          }}>
+            {isNativeMobile
+              ? "Get personalized health insights and guidance"
+              : "Get personalized health insights, symptom analysis, medication guidance, and evidence-based wellness recommendations"
+            }
+          </Text>
+        </Animated.View>
+
+        <Animated.View
+          style={{
+            marginTop: isNativeMobile ? 12 : 20, // Less margin on mobile
+            marginBottom: isNativeMobile ? 32 : 60, // More space before input
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{
+            fontSize: isNativeMobile ? 13 : 14, // Smaller text on mobile
+            color: colors.text,
+            textAlign: "center",
+            opacity: 0.7,
+            fontFamily: "Manrope_400Regular",
+            maxWidth: isNativeMobile ? 280 : 300, // Slightly narrower on mobile
+          }}>
+            {isNativeMobile
+              ? "Start a conversation below"
+              : "Ask me about symptoms, medications, wellness tips, or any health-related questions"
+            }
+          </Text>
+        </Animated.View>
+      </Animated.View>
+    )}
               <Chat.Input
                 onSendMessage={sendMessage}
                 onUploadFiles={(assets) =>

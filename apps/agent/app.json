@@ -1,19 +1,19 @@
 {
   "expo": {
-    "name": "DKG Agent",
-    "slug": "dkg-agent",
+    "name": "Medsy Health AI",
+    "slug": "medsy-health-ai",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./src/assets/images/icon.png",
-    "scheme": "exampleedgenode",
-    "userInterfaceStyle": "automatic",
+    "icon": "./src/assets/medsy-logo-icon.svg",
+    "scheme": "medsy-health",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./src/assets/images/adaptive-icon.png",
+        "foregroundImage": "./src/assets/medsy-logo-icon.svg",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true
@@ -21,21 +21,17 @@
     "web": {
       "bundler": "metro",
       "output": "server",
-      "favicon": "./src/assets/images/favicon.png"
+      "favicon": "./src/assets/medsy-favicon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./src/assets/images/splash-icon.png",
+          "image": "./src/assets/medsy-logo-icon.svg",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#F8F7FC",
-          "dark": {
-            "image": "./src/assets/images/splash-icon.png",
-            "backgroundColor": "#110734"
-          }
+          "backgroundColor": "#FFFEFE"
         }
       ]
     ],

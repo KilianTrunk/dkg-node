@@ -1,4 +1,12 @@
-import Svg, { SvgProps, Rect, Path } from "react-native-svg";
+import React from "react";
+import Svg, {
+  SvgProps,
+  Path,
+  Circle,
+  Defs,
+  LinearGradient,
+  Stop,
+} from "react-native-svg";
 
 import useColors from "@/hooks/useColors";
 
@@ -6,11 +14,33 @@ export default function ChatMessageIconUser(props: SvgProps) {
   const colors = useColors();
 
   return (
-    <Svg width={32} height={32} fill="none" {...props}>
-      <Rect width={32} height={32} fill={colors.primary} rx={16} />
+    <Svg width={32} height={32} viewBox="0 0 32 32" {...props}>
+      <Defs>
+        {/* User icon gradient - slightly different shade */}
+        <LinearGradient id="userGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <Stop offset="0%" stopColor="#E57373" />
+          <Stop offset="100%" stopColor="#FF9999" />
+        </LinearGradient>
+      </Defs>
+
+      {/* User circle background */}
+      <Circle
+        cx={16}
+        cy={16}
+        r={14}
+        fill="url(#userGradient)"
+        stroke={colors.primary}
+        strokeWidth={1.5}
+      />
+
+      {/* User/person icon */}
       <Path
-        fill={colors.primaryText}
-        d="M12.316 11.817c0 2.01 1.653 3.647 3.683 3.647s3.683-1.637 3.683-3.647-1.653-3.647-3.683-3.647-3.683 1.637-3.683 3.647ZM23.148 21.656c0-3.04-2.498-5.511-5.565-5.511h-3.167c-3.067 0-5.565 2.471-5.565 5.51 0 1.22 1 2.212 2.233 2.212h9.83c1.233 0 2.234-.991 2.234-2.211Z"
+        d="M12 20c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5M16 10.5c1.5 0 2.5 1.5 2.5 3s-1 3-2.5 3-2.5-1-2.5-3 1-3 2.5-3z"
+        stroke="white"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
       />
     </Svg>
   );
