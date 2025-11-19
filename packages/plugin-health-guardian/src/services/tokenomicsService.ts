@@ -453,5 +453,81 @@ export class TokenomicsService {
     }
   }
 
+  /**
+   * Process premium payment (like staking but for premium access)
+   * Transfers TRAC tokens for premium access to enhanced analysis
+   */
+  async processPremiumPayment(noteId: string, amount: number): Promise<{
+    transactionHash: string;
+    blockNumber?: number;
+    premiumPoolAddress: string;
+  }> {
+    await this.initialize();
+
+    const userId = "demo_user"; // Mock user ID for now
+
+    if (amount <= 0) {
+      throw new Error(`Payment amount must be greater than 0`);
+    }
+
+    if (!this.tokenService.hasTracContract()) {
+      throw new Error("TRAC contract not configured - blockchain integration required");
+    }
+
+    console.log("💎 Processing premium payment:", {
+      noteId,
+      userId,
+      amount,
+      currency: "TRAC"
+    });
+
+    try {
+      // Convert amount to token units
+      const paymentAmount = this.tokenService.parseTracAmount(amount.toString());
+
+      // Check user balance
+      const signer = this.blockchainProvider.getSigner();
+      const userAddress = await signer.getAddress();
+      const balance = await this.tokenService.getTracBalance(userAddress);
+
+      if (balance < paymentAmount) {
+        throw new Error(`Insufficient TRAC balance. Required: ${this.tokenService.formatTracAmount(paymentAmount)}, Available: ${this.tokenService.formatTracAmount(balance)}`);
+      }
+
+      // Generate premium access pool address
+      const premiumPoolAddress = this.generatePremiumPoolAddress(noteId);
+
+      // Transfer tokens to premium pool (like staking transfers to staking pool)
+      const tx = await this.tokenService.transferTrac(premiumPoolAddress, paymentAmount);
+
+      console.log("✅ Premium payment completed:", {
+        transactionHash: tx.hash,
+        premiumPoolAddress,
+        amount: this.tokenService.formatTracAmount(paymentAmount),
+        blockNumber: tx.blockNumber
+      });
+
+      return {
+        transactionHash: tx.hash,
+        blockNumber: tx.blockNumber || undefined,
+        premiumPoolAddress
+      };
+
+    } catch (error) {
+      console.error("❌ Premium payment failed:", error);
+      throw new Error(`Premium payment failed: ${error instanceof Error ? error.message : 'Unknown blockchain error'}`);
+    }
+  }
+
+  /**
+   * Generate premium pool address (like staking pools)
+   */
+  private generatePremiumPoolAddress(noteId: string): string {
+    // Generate deterministic address based on note for premium access pool
+    const hash = ethers.keccak256(
+      ethers.toUtf8Bytes(`${noteId}-premium-access-pool`)
+    );
+    return ethers.getAddress(ethers.dataSlice(hash, 0, 20));
+  }
 
 }

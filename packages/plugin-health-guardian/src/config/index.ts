@@ -150,7 +150,7 @@ export const DKG_CONFIG = {
     name: process.env.HG_DKG_BLOCKCHAIN || "otp"
   },
   publishing: {
-    epochsNum: parseInt(process.env.HG_DKG_EPOCHS_NUM || "5"),
+    epochsNum: parseInt(process.env.HG_DKG_EPOCHS_NUM || "3"), // Reduced from 5 to 3 for faster publishing
     minimumNumberOfFinalizationConfirmations: parseInt(process.env.HG_DKG_MIN_CONFIRMATIONS || "1"),
     minimumNumberOfNodeReplications: parseInt(process.env.HG_DKG_MIN_REPLICATIONS || "1"),
   }

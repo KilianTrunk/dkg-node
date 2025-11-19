@@ -10,6 +10,48 @@ import * as schema from "../database/schema";
 import type { LiteratureService } from "../services";
 
 /**
+ * Sanitize URL to ensure ASCII characters (prevent unicode dash issues)
+ */
+function sanitizeUrl(url: string): string {
+  return url.replace(/[\u2010-\u2015\u2212]/g, '-'); // Replace unicode dashes with ASCII hyphens
+}
+
+/**
+ * Clean text by removing HTML tags and converting to proper formatting
+ */
+function cleanText(text: string): string {
+  if (!text) return text;
+
+  // Remove HTML tags
+  text = text.replace(/<[^>]*>/g, '');
+
+  // Convert HTML entities
+  text = text.replace(/&nbsp;/g, ' ');
+  text = text.replace(/&amp;/g, '&');
+  text = text.replace(/&lt;/g, '<');
+  text = text.replace(/&gt;/g, '>');
+  text = text.replace(/&quot;/g, '"');
+  text = text.replace(/&#39;/g, "'");
+  text = text.replace(/&#x27;/g, "'");
+  text = text.replace(/&apos;/g, "'");
+
+  // Convert <br> and <br/> to newlines
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+
+  // Remove other common HTML artifacts
+  text = text.replace(/<\/?p>/gi, '');
+  text = text.replace(/<\/?div>/gi, '');
+  text = text.replace(/<\/?span>/gi, '');
+
+  // Clean up extra whitespace and normalize line breaks
+  text = text.replace(/\s+/g, ' ');
+  text = text.replace(/\n\s+/g, '\n');
+  text = text.trim();
+
+  return text;
+}
+
+/**
  * Generate basic note content for regular users
  */
 function generateBasicNoteContent(content: any, stakesData: any[], note?: any, ual?: string): string {
@@ -25,7 +67,7 @@ function generateBasicNoteContent(content: any, stakesData: any[], note?: any, u
 - Support: ${stakesData.filter(s => s.position === 'support').length}
 - Oppose: ${stakesData.filter(s => s.position === 'oppose').length}
 
-**UAL:** ${note?.ual || ual || 'N/A'}`;
+**🔗 DKG Permanent Record:** ${note?.ual ? sanitizeUrl(`https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(note.ual)}`) : ual ? sanitizeUrl(`https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(ual)}`) : 'N/A'}`;
 }
 
 /**
@@ -65,12 +107,12 @@ ${getAnalysisMethodology(content)}
 ${getExpertCommentary(content.verdict, content.confidence)}
 
 **📖 RELATED MEDICAL LITERATURE:**
-${await literatureService.getLiteratureSummary(originalClaim || content.description || content.summary || "medical research", aiService)}
+${cleanText(await literatureService.getLiteratureSummary(originalClaim || content.description || content.summary || "medical research", aiService))}
 
 **⚖️ BIAS ASSESSMENT:**
 ${assessBiasAndLimitations(content)}
 
-**🔗 UAL:** ${note?.ual || 'N/A'}
+**🔗 DKG Permanent Record:** ${note?.ual ? sanitizeUrl(`https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(note.ual)}`) : 'N/A'}
 **⏰ Analysis Timestamp:** ${note?.createdAt ? new Date(note.createdAt).toISOString() : 'N/A'}`;
 }
 
@@ -448,15 +490,18 @@ export function registerGetNoteTool(
         if (blockchain.startsWith('otp:')) {
           statusReport += `🌐 OriginTrail Parachain Testnet Detected\n\n`;
           statusReport += `🔗 Web Explorers to Check:\n`;
-          statusReport += `1. **OriginTrail Explorer**: https://origintrail.subscan.io/\n`;
+          statusReport += `1. **DKG Testnet Explorer**: ${sanitizeUrl(`https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(ual)}`)}\n`;
+          statusReport += `   - Direct link to view this Knowledge Asset\n\n`;
+
+          statusReport += `2. **OriginTrail Explorer**: https://origintrail.subscan.io/\n`;
           statusReport += `   - Search for contract: ${contractAddress}\n`;
           statusReport += `   - Look for Knowledge Collection ID: ${assetId}\n\n`;
 
-          statusReport += `2. **Polkadot.js Explorer**: https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fastrosat-parachain-rpc.origin-trail.network#/explorer\n`;
+          statusReport += `3. **Polkadot.js Explorer**: https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fastrosat-parachain-rpc.origin-trail.network#/explorer\n`;
           statusReport += `   - Connect to OriginTrail Parachain\n`;
           statusReport += `   - Search for extrinsics related to Knowledge Assets\n\n`;
 
-          statusReport += `3. **DKG Node Web Interface**: Check your running DKG node at http://localhost:8900\n`;
+          statusReport += `4. **DKG Node Web Interface**: Check your running DKG node at http://localhost:8900\n`;
           statusReport += `   - Look for published assets in the interface\n\n`;
         }
 

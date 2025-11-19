@@ -2,134 +2,135 @@ import { getPaymentConfig, getTokenConfig } from "../config";
 import { ethers } from "ethers";
 import { BlockchainProvider } from "./blockchainProvider";
 import { TokenContractService } from "./tokenContractService";
+import { X402PaymentService, X402PaymentRequest, X402PaymentResponse } from "./x402PaymentService";
 
 /**
  * Premium Payment Service
- * Implements TRAC token payments for premium content access (like staking)
+ * Implements x402 micropayment protocol for premium content access
  */
 export class PaymentService {
   private blockchainProvider!: BlockchainProvider;
   private tokenService!: TokenContractService;
+  private x402Service!: X402PaymentService;
   private initialized = false;
 
   async initialize() {
     if (this.initialized) return;
 
-    console.log("💰 Initializing Premium Payment Service...");
+    console.log("💰 Initializing Premium Payment Service with x402...");
 
-    // Initialize blockchain provider for TRAC payments (like staking)
+    // Initialize blockchain provider for stablecoin payments
     this.blockchainProvider = new BlockchainProvider();
     await this.blockchainProvider.initialize();
 
-    // Initialize token contract service for TRAC transfers
+    // Initialize token contract service for stablecoin transfers
     this.tokenService = new TokenContractService(this.blockchainProvider);
     await this.tokenService.initialize();
+
+    // Initialize x402 payment service
+    this.x402Service = new X402PaymentService();
+    await this.x402Service.initialize();
 
     this.initialized = true;
 
     const tokenConfig = getTokenConfig();
-    console.log("✅ Premium Payment Service initialized with config:", {
-      tracContract: tokenConfig.TRAC.contractAddress,
-      network: this.blockchainProvider.getNetworkName()
+    console.log("✅ Premium Payment Service initialized with x402:", {
+      network: this.blockchainProvider.getNetworkName(),
+      x402Enabled: true,
+      supportedCurrencies: ["USDC", "USDT", "DAI"]
     });
   }
 
   /**
-   * Process premium access payment using TRAC tokens (like staking)
-   * Transfers TRAC tokens and grants immediate access
-   */
-  async processPremiumAccess(
-    userId: string,
-    noteId: string,
-    amount: number
-  ): Promise<{ transactionHash: string; grantedAt: Date; expiresAt: Date }> {
-    await this.initialize();
-
-    const tokenConfig = getTokenConfig();
-    if (amount < 0.01) { // Minimum 0.01 TRAC for premium access
-      throw new Error(`Payment amount must be at least 0.01 TRAC`);
-    }
-
-    if (!this.tokenService.hasTracContract()) {
-      throw new Error("TRAC contract not configured - blockchain integration required for premium access");
-    }
-
-    console.log("💳 Processing TRAC premium access payment:", {
-      userId,
-      noteId,
-      amount,
-      currency: "TRAC"
-    });
-
-    try {
-      // Get user wallet address (in production, this would be from user auth)
-      const userAddress = await this.getUserWalletAddress(userId);
-      if (!userAddress) {
-        throw new Error(`No wallet address found for user ${userId}`);
-      }
-
-      // Check user balance
-      const balance = await this.tokenService.getTracBalance(userAddress);
-      const requiredAmount = this.tokenService.parseTracAmount(amount.toString());
-
-      if (balance < requiredAmount) {
-        throw new Error(`Insufficient TRAC balance. Required: ${this.tokenService.formatTracAmount(requiredAmount)}, Available: ${this.tokenService.formatTracAmount(balance)}`);
-      }
-
-      // Generate premium access pool address (like staking pools)
-      const premiumPoolAddress = this.generatePremiumPoolAddress(noteId);
-
-      // Transfer TRAC tokens to premium pool
-      const tx = await this.tokenService.transferTrac(premiumPoolAddress, requiredAmount);
-
-      // Calculate access period (24 hours from now)
-      const grantedAt = new Date();
-      const expiresAt = new Date(grantedAt.getTime() + 24 * 60 * 60 * 1000); // 24 hours
-
-      console.log("✅ Premium access payment completed:", {
-        userId,
-        noteId,
-        amount: this.tokenService.formatTracAmount(requiredAmount),
-        transactionHash: tx.hash,
-        grantedAt,
-        expiresAt
-      });
-
-      return {
-        transactionHash: tx.hash || '',
-        grantedAt,
-        expiresAt
-      };
-    } catch (error) {
-      console.error("❌ Premium access payment failed:", error);
-      throw new Error(`Premium access payment failed: ${error instanceof Error ? error.message : 'Unknown blockchain error'}`);
-    }
-  }
-
-  /**
-   * Request premium access payment (legacy x402 compatibility)
-   * Now processes payment immediately like staking
+   * Create x402 payment request for premium access
+   * Returns payment details that client can use to complete micropayment
    */
   async requestPremiumAccess(
     userId: string,
     noteId: string,
-    amount: number
-  ): Promise<{ paymentUrl: string; paymentId: string; paymentHeaders: Record<string, string> }> {
-    // Process payment immediately and return success info
-    const result = await this.processPremiumAccess(userId, noteId, amount);
+    amount: number = 0.01
+  ): Promise<X402PaymentResponse> {
+    await this.initialize();
 
-    // Return format compatible with existing x402 expectations
-    return {
-      paymentUrl: `completed:${result.transactionHash}`,
-      paymentId: `premium_${Date.now()}`,
-      paymentHeaders: {
-        'X-Payment-Status': 'completed',
-        'X-Transaction-Hash': result.transactionHash,
-        'X-Granted-At': result.grantedAt.toISOString(),
-        'X-Expires-At': result.expiresAt.toISOString()
-      }
-    };
+    if (amount < 0.01) {
+      throw new Error(`Payment amount must be at least 0.01 USD`);
+    }
+
+    console.log("💰 Creating x402 payment request:", {
+      userId,
+      noteId,
+      amount,
+      currency: "USD"
+    });
+
+    const description = `Premium access to enhanced health analysis with medical citations for note ${noteId}`;
+
+    try {
+      const paymentRequest = await this.x402Service.createPaymentRequest(
+        amount,
+        description,
+        userId
+      );
+
+      console.log("✅ x402 Payment request created:", {
+        paymentId: paymentRequest.paymentId,
+        amount: paymentRequest.amount,
+        currency: paymentRequest.currency
+      });
+
+      return paymentRequest;
+    } catch (error) {
+      console.error("❌ x402 payment request failed:", error);
+      throw new Error(`x402 payment request failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
+
+  /**
+   * Process completed x402 payment for premium access
+   * Called after payment is completed via x402 protocol
+   */
+  async processPremiumAccess(
+    paymentId: string,
+    payerAddress: string,
+    transactionHash?: string
+  ): Promise<{ transactionHash: string; grantedAt: Date; expiresAt: Date }> {
+    await this.initialize();
+
+    console.log("💰 Processing x402 premium access payment:", {
+      paymentId,
+      payerAddress,
+      transactionHash
+    });
+
+    try {
+      const payment = await this.x402Service.processPayment(paymentId, payerAddress, transactionHash);
+
+      if (payment.status !== "payment_completed") {
+        throw new Error(`Payment not completed. Status: ${payment.status}`);
+      }
+
+      console.log("✅ x402 Premium access payment completed:", {
+        paymentId,
+        transactionHash: payment.transactionHash,
+        amount: payment.amount,
+        currency: payment.currency
+      });
+
+      // Calculate access period (30 days from now)
+      const grantedAt = new Date();
+      const expiresAt = new Date(grantedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+      return {
+        transactionHash: payment.transactionHash!,
+        grantedAt,
+        expiresAt
+      };
+    } catch (error) {
+      console.error("❌ x402 premium access payment failed:", error);
+      throw new Error(`x402 premium access payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
 
   /**
    * Get user wallet address (production implementation)

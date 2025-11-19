@@ -1,6 +1,41 @@
 import type { AnalysisResult, IAIAnalysisService } from "../types";
 import { aiLogger } from "./Logger";
 
+/**
+ * Clean text by removing HTML tags and converting to proper formatting
+ */
+function cleanText(text: string): string {
+  if (!text) return text;
+
+  // Remove HTML tags
+  text = text.replace(/<[^>]*>/g, '');
+
+  // Convert HTML entities
+  text = text.replace(/&nbsp;/g, ' ');
+  text = text.replace(/&amp;/g, '&');
+  text = text.replace(/&lt;/g, '<');
+  text = text.replace(/&gt;/g, '>');
+  text = text.replace(/&quot;/g, '"');
+  text = text.replace(/&#39;/g, "'");
+  text = text.replace(/&#x27;/g, "'");
+  text = text.replace(/&apos;/g, "'");
+
+  // Convert <br> and <br/> to newlines
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+
+  // Remove other common HTML artifacts
+  text = text.replace(/<\/?p>/gi, '');
+  text = text.replace(/<\/?div>/gi, '');
+  text = text.replace(/<\/?span>/gi, '');
+
+  // Clean up extra whitespace and normalize line breaks
+  text = text.replace(/\s+/g, ' ');
+  text = text.replace(/\n\s+/g, '\n');
+  text = text.trim();
+
+  return text;
+}
+
 // LLM provider will be accessed dynamically at runtime
 // This avoids import issues while still using the agent's configured LLM
 
@@ -64,17 +99,12 @@ export class AIAnalysisService implements IAIAnalysisService {
       }
     }
 
-    // Try real AI analysis first
-    if (this.llm) {
-      try {
-        return await this.performRealAnalysis(claim, context);
-      } catch (error) {
-        aiLogger.warn("Real AI analysis failed, falling back to mock", { error });
-      }
+    // Require real AI analysis - no mock fallbacks in production
+    if (!this.llm) {
+      throw new Error("AI service not initialized - cannot perform analysis without LLM");
     }
 
-    // Fallback to mock analysis
-    return this.performMockAnalysis(claim, context);
+    return await this.performRealAnalysis(claim, context);
   }
 
   private async performRealAnalysis(claim: string, context?: string): Promise<AnalysisResult> {
@@ -131,7 +161,7 @@ Provide your analysis in the following JSON format:
         // Handle different response formats
         if (Array.isArray(response.content)) {
           // Sometimes LLM returns array of message parts
-          content = response.content.map(part =>
+          content = response.content.map((part: any) =>
             typeof part === 'string' ? part : part.text || JSON.stringify(part)
           ).join('');
         } else if (response.content.text) {
@@ -166,11 +196,17 @@ Provide your analysis in the following JSON format:
         parsed.verdict = "uncertain";
       }
 
+      // Clean HTML tags from AI-generated content
+      const cleanSummary = cleanText(parsed.summary);
+      const cleanSources = Array.isArray(parsed.sources)
+        ? parsed.sources.map(source => cleanText(source))
+        : ["General Medical Literature"];
+
       return {
         verdict: parsed.verdict,
         confidence: Math.max(0, Math.min(1, parsed.confidence || 0.5)), // Clamp to 0-1
-        summary: parsed.summary,
-        sources: Array.isArray(parsed.sources) ? parsed.sources : ["General Medical Literature"]
+        summary: cleanSummary,
+        sources: cleanSources
       };
     } catch (error) {
       aiLogger.error("Failed to parse LLM response", {

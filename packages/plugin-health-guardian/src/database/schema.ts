@@ -60,3 +60,21 @@ export const agentRewards = sqliteTable("agent_rewards", {
   distributedAt: integer("distributed_at", { mode: "timestamp" }).notNull(),
   reason: text("reason"), // Description of why reward was given
 });
+
+// x402 payments table - tracks micropayment requests and completions
+export const x402Payments = sqliteTable("x402_payments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  paymentId: text("payment_id").notNull().unique(), // Unique payment identifier
+  amount: text("amount").notNull(), // Payment amount as string (e.g., "0.01")
+  currency: text("currency").notNull(), // Currency code (e.g., "USDC", "USD")
+  description: text("description").notNull(), // Payment description
+  status: text("status").notNull().default("payment_required"), // payment_required, payment_pending, payment_completed
+  userId: text("user_id"), // Associated user ID
+  noteId: text("note_id"), // Associated note ID for premium access
+  transactionHash: text("transaction_hash"), // Blockchain transaction hash when completed
+  payerAddress: text("payer_address"), // Address that made the payment
+  paymentUrl: text("payment_url"), // URL for payment completion
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+});

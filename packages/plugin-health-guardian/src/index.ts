@@ -15,7 +15,10 @@ import { registerPublishNoteTool } from "./tools/publishNote";
 import { registerGetNoteTool } from "./tools/getNote";
 import { registerStakeTokensTool } from "./tools/stakeTokens";
 import { registerPremiumAccessTool } from "./tools/premiumAccess";
+import { registerGetPremiumAnalysisTool } from "./tools/getPremiumAnalysis";
+import { registerCompletePaymentTool } from "./tools/completePayment";
 import { registerDistributeRewardsTool } from "./tools/distributeRewards";
+import { registerAutonomousAnalysisTool } from "./tools/autonomousAnalysis";
 
 // Helper function to safely parse sources JSON
 function parseSources(sourcesJson: string | null): string[] {
@@ -76,11 +79,22 @@ export default defineDkgPlugin((ctx, mcp, api) => {
       const literatureService = container.get<LiteratureService>("literatureService");
 
       registerAnalyzeClaimTool(mcp, ctx, aiService, db);
+      registerAutonomousAnalysisTool(mcp, ctx, { aiService, dkgService, tokenomicsService });
       registerPublishNoteTool(mcp, ctx, dkgService, db);
       registerGetNoteTool(mcp, ctx, dkgService, aiService, literatureService, db);
       registerStakeTokensTool(mcp, ctx, tokenomicsService, db);
-      registerPremiumAccessTool(mcp, ctx, paymentService, db);
+      registerPremiumAccessTool(mcp, ctx, tokenomicsService, db); // Use tokenomics service like staking
+      registerGetPremiumAnalysisTool(mcp, ctx, literatureService, db);
+      registerCompletePaymentTool(mcp, ctx, paymentService, db);
       registerDistributeRewardsTool(mcp, ctx, tokenomicsService);
+
+      // Initialize x402 service (lazy load to avoid import issues)
+      const initializeX402 = async () => {
+        const { X402PaymentService } = await import("./services/x402PaymentService.js");
+        const x402Service = new X402PaymentService();
+        await x402Service.initialize();
+        return x402Service;
+      };
     })
     .catch((error) => {
       console.error("Health Guardian Plugin initialization failed:", error);
@@ -390,6 +404,113 @@ export default defineDkgPlugin((ctx, mcp, api) => {
       res.json(health);
     } catch (error: any) {
       console.error("Failed to get comprehensive metrics:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // x402 Payment endpoints
+  api.get("/health/x402/pay/:paymentId", async (req, res) => {
+    if (!serviceContainer) {
+      return res.status(503).json({ error: "Services not initialized" });
+    }
+
+    try {
+      const { X402PaymentService } = await import("./services/x402PaymentService.js");
+      const x402Service = new X402PaymentService();
+      await x402Service.initialize();
+
+      const payment = await x402Service.getPaymentStatus(req.params.paymentId);
+      if (!payment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+
+      if (payment.status === "payment_completed") {
+        return res.json({
+          status: "completed",
+          message: "Payment already completed",
+          payment
+        });
+      }
+
+      // Return payment information for client to complete
+      res.json({
+        status: "pending",
+        message: "Complete the payment using your x402-compatible wallet",
+        payment: {
+          id: payment.paymentId,
+          amount: payment.amount,
+          currency: payment.currency,
+          description: payment.description,
+          expiresAt: payment.expiresAt
+        }
+      });
+    } catch (error: any) {
+      console.error("Failed to get x402 payment:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Complete x402 payment
+  api.post("/health/x402/complete/:paymentId", async (req, res) => {
+    if (!serviceContainer) {
+      return res.status(503).json({ error: "Services not initialized" });
+    }
+
+    try {
+      const { paymentId } = req.params;
+      const { transactionHash, payerAddress } = req.body;
+
+      if (!transactionHash || !payerAddress) {
+        return res.status(400).json({
+          error: "Missing required fields: transactionHash, payerAddress"
+        });
+      }
+
+      const { X402PaymentService } = await import("./services/x402PaymentService.js");
+      const x402Service = new X402PaymentService();
+      await x402Service.initialize();
+
+      const payment = await x402Service.processPayment(paymentId, payerAddress, transactionHash);
+
+      if (payment.status === "payment_completed") {
+        // Grant premium access
+        const userId = "demo_user"; // In production, get from auth
+        const paymentService = serviceContainer.get<IPaymentService>("paymentService");
+
+        // Extract noteId from payment description
+        const noteIdMatch = payment.description.match(/note (\w+)/);
+        const noteId = noteIdMatch ? noteIdMatch[1] : "unknown";
+
+        const accessResult = await paymentService.processPremiumAccess(paymentId, payerAddress, transactionHash);
+
+        // Record premium access in database
+        await db.insert(premiumAccess).values({
+          userId,
+          noteId: noteId || "unknown",
+          paymentAmount: parseFloat(payment.amount),
+          grantedAt: accessResult.grantedAt,
+          expiresAt: accessResult.expiresAt
+        });
+
+        res.json({
+          status: "success",
+          message: "Premium access granted",
+          payment,
+          access: {
+            grantedAt: accessResult.grantedAt,
+            expiresAt: accessResult.expiresAt,
+            transactionHash: accessResult.transactionHash
+          }
+        });
+      } else {
+        res.status(402).json({
+          status: "pending",
+          message: "Payment verification in progress",
+          payment
+        });
+      }
+    } catch (error: any) {
+      console.error("Failed to complete x402 payment:", error);
       res.status(500).json({ error: error.message });
     }
   });

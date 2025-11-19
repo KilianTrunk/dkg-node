@@ -9,21 +9,13 @@ export class DkgService implements IDkgService {
   private dkgClient: any = null;
 
   async initialize(ctx?: any) {
-    // If context is provided (from plugin), use ctx.dkg
-    // Otherwise, this service is being used standalone
-    if (ctx?.dkg) {
-      this.dkgClient = ctx.dkg;
-      dkgLogger.info("DKG Service initialized with real DKG client from context");
-    } else {
-      // Fallback for standalone usage (mock)
-      dkgLogger.warn("DKG Service initialized in mock mode - no DKG context provided");
-      this.dkgClient = {
-        asset: {
-          create: this.mockPublish.bind(this),
-          get: this.mockGet.bind(this)
-        }
-      };
+    // Require DKG context - no mock fallbacks allowed for production
+    if (!ctx?.dkg) {
+      throw new Error("DKG context required - cannot initialize DKG service without proper DKG client");
     }
+
+    this.dkgClient = ctx.dkg;
+    dkgLogger.info("DKG Service initialized with real DKG client from context");
   }
 
   /**
@@ -39,8 +31,31 @@ export class DkgService implements IDkgService {
       privacy
     });
 
-    // Wrap content as per DKG API requirements
-    const wrappedContent = { [privacy]: content };
+    // Create simple JSON-LD for DKG (following working pattern from publishNote)
+    const jsonLdContent = {
+      "@context": "https://schema.org/",
+      "@type": "MedicalWebPage",
+      "@id": `urn:health-claim:${Date.now()}`,
+      "name": "Health Claim Analysis",
+      "description": content.claim || "AI-powered health claim analysis",
+      "text": content.summary || "Evidence-based health claim verification",
+      "datePublished": new Date().toISOString(),
+      "publisher": {
+        "@type": "Organization",
+        "name": "Health Guardian AI"
+      },
+      // Custom properties (DKG may accept these)
+      "claimId": content.claimId,
+      "claim": content.claim,
+      "agentId": content.agentId,
+      "agentName": content.agentName,
+      "verdict": content.verdict,
+      "confidence": content.confidence,
+      "sources": content.sources,
+      "analysis": content.analysis
+    };
+
+    const wrappedContent = { [privacy]: jsonLdContent };
 
     try {
       // Use real DKG Edge Node (following working pattern from dkg-publisher)
@@ -131,51 +146,10 @@ export class DkgService implements IDkgService {
   }
 
   /**
-   * Mock publishing for development
+   * Execute SPARQL query on DKG
    */
-  private async mockPublish(content: any): Promise<DkgPublishResult> {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const mockUAL = `did:dkg:${DKG_CONFIG.blockchain.name}:health-asset:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
-
-    dkgLogger.info("Mock DKG publish successful", { ual: mockUAL });
-
-    return {
-      UAL: mockUAL,
-      transactionHash: `0x${Math.random().toString(16).substr(2, 64)}`,
-      blockNumber: Math.floor(Math.random() * 1000000)
-    };
+  async executeSparqlQuery(query: string): Promise<any> {
+    return this.queryHealthAssets(query);
   }
 
-  /**
-   * Mock retrieval for development
-   */
-  private async mockGet(ual: string): Promise<any> {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Return mock data for testing
-    return {
-      assertion: {
-        public: {
-          verdict: "mock",
-          confidence: 0.5,
-          description: "Mock data - DKG not available",
-          sources: ["Mock Source"]
-        }
-      }
-    };
-  }
-
-  /**
-   * Mock SPARQL query for development
-   */
-  async executeSparqlQuery(query: string) {
-    dkgLogger.info("SPARQL query requested", { queryPreview: query.substring(0, 100) + "..." });
-    return {
-      success: false,
-      error: "SPARQL queries not yet implemented"
-    };
-  }
 }

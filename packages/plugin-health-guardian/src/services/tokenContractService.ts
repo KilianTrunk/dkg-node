@@ -119,7 +119,7 @@ export class TokenContractService {
       console.log('🔄 Neuroweb detected: Using ERC-20 TRAC transfer');
       const contract = this.getTracContract();
       const signer = this.blockchainProvider.getSigner();
-      const tx = await contract.connect(signer).transfer(to, amount);
+      const tx = await (contract.connect(signer) as any).transfer(to, amount);
 
       await tx.wait();
       console.log("✅ TRAC transfer completed:", tx.hash);
@@ -128,7 +128,7 @@ export class TokenContractService {
       // Use ERC-20 contract transfer for other networks
       const contract = this.getTracContract();
       const signer = this.blockchainProvider.getSigner();
-      const tx = await contract.connect(signer).transfer(to, amount);
+      const tx = await (contract.connect(signer) as any).transfer(to, amount);
 
       await tx.wait();
       console.log("✅ TRAC transfer completed:", tx.hash);

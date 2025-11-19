@@ -5,6 +5,7 @@ import { AnalyzeClaimSchema, IAIAnalysisService } from "../types";
 import { healthClaims } from "../database";
 import * as schema from "../database/schema";
 import { createServiceLogger } from "../services/Logger";
+import { requireAuthenticatedAgent } from "../services/agentAuthService";
 
 const logger = createServiceLogger("AnalyzeClaimTool");
 
@@ -17,6 +18,9 @@ export function registerAnalyzeClaimTool(
   aiService: IAIAnalysisService,
   db: BetterSQLite3Database<typeof schema>
 ) {
+  // Initialize agent auth service
+  const { AgentAuthService } = require("../services/agentAuthService");
+  const agentAuthService = new AgentAuthService();
   mcp.registerTool(
     "analyze-health-claim",
     {
@@ -28,11 +32,26 @@ export function registerAnalyzeClaimTool(
       try {
         logger.info("Analyzing health claim", { claimLength: claim.length, hasContext: !!context });
 
+        // Authenticate agent
+        const agent = requireAuthenticatedAgent(ctx);
+        if (!agent) {
+          return {
+            content: [{ type: "text", text: "Agent authentication required" }],
+            isError: true
+          };
+        }
+
+        logger.info("Authenticated agent for analysis", {
+          agentId: agent.agentId,
+          name: agent.name,
+          walletAddress: agent.walletAddress
+        });
+
         const analysis = await aiService.analyzeHealthClaim(claim, context);
 
         // Store claim and analysis in database for tracking and rewards
         const claimId = `claim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const agentId = "agent_123"; // In production, this would come from authenticated agent context
+        const agentId = agent.agentId;
 
         await db.insert(healthClaims).values({
           claimId,
