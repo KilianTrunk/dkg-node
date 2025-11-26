@@ -293,7 +293,13 @@ export default function ChatMessageToolCall({
           <Text
             style={{ fontFamily: "Manrope_400Regular", color: colors.text }}
           >
-            Running tool...
+            {title.includes("autonomous") || title.includes("analysis") 
+              ? "Reviewing medical evidence..." 
+              : title.includes("premium") || title.includes("payment")
+              ? "Processing payment..."
+              : title.includes("stake")
+              ? "Confirming transaction..."
+              : "Consulting medical database..."}
           </Text>
         </View>
       )}

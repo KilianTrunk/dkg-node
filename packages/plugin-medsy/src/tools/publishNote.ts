@@ -32,6 +32,9 @@ export function registerPublishNoteTool(
         // Generate noteId first
         const noteId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+        // Find related knowledge assets before publishing
+        const relatedUals = await dkgService.findRelatedUals(summary, 5);
+
         // Create JSON-LD for DKG Knowledge Asset (unwrapped)
         const noteContent = {
           "@context": "https://schema.org/",
@@ -49,8 +52,8 @@ export function registerPublishNoteTool(
           }
         };
 
-        // Publish to DKG using real Edge Node
-        const result = await dkgService.publishKnowledgeAsset(noteContent, "public");
+        // Publish to DKG using real Edge Node, connecting to existing assets
+        const result = await dkgService.publishKnowledgeAsset(noteContent, "public", relatedUals);
 
         // Store minimal metadata locally for relationships and quick access
         // The actual Knowledge Asset lives on DKG and is discoverable network-wide

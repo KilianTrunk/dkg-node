@@ -21,7 +21,7 @@ export class DkgService implements IDkgService {
   /**
    * Publish a Knowledge Asset to the DKG
    */
-  async publishKnowledgeAsset(content: any, privacy: "private" | "public" = "private"): Promise<DkgPublishResult> {
+  async publishKnowledgeAsset(content: any, privacy: "private" | "public" = "private", relatedUals?: string[]): Promise<DkgPublishResult> {
     if (!this.dkgClient) {
       throw new Error("DKG client not initialized");
     }
@@ -32,7 +32,7 @@ export class DkgService implements IDkgService {
     });
 
     // Create simple JSON-LD for DKG (following working pattern from publishNote)
-    const jsonLdContent = {
+    const jsonLdContent: any = {
       "@context": "https://schema.org/",
       "@type": "MedicalWebPage",
       "@id": `urn:health-claim:${Date.now()}`,
@@ -54,6 +54,12 @@ export class DkgService implements IDkgService {
       "sources": content.sources,
       "analysis": content.analysis
     };
+
+    // Connect to existing knowledge assets if UALs provided
+    if (relatedUals && relatedUals.length > 0) {
+      jsonLdContent.mentions = relatedUals;
+      jsonLdContent.references = relatedUals.slice(0, 3); // Limit references to first 3
+    }
 
     const wrappedContent = { [privacy]: jsonLdContent };
 
@@ -150,6 +156,59 @@ export class DkgService implements IDkgService {
    */
   async executeSparqlQuery(query: string): Promise<any> {
     return this.queryHealthAssets(query);
+  }
+
+  /**
+   * Find related knowledge assets by searching for similar content
+   * Returns UALs of existing assets that might be related to the claim
+   */
+  async findRelatedUals(claim: string, limit: number = 5): Promise<string[]> {
+    if (!this.dkgClient) {
+      return [];
+    }
+
+    try {
+      // Extract key words from claim (remove common words)
+      const claimLower = claim.toLowerCase();
+      const keywords = claimLower
+        .split(/\s+/)
+        .filter(word => word.length > 3 && !['that', 'this', 'with', 'from', 'have', 'been', 'does', 'make', 'makes'].includes(word))
+        .slice(0, 3); // Use top 3 keywords
+
+      if (keywords.length === 0) {
+        keywords.push(claimLower.substring(0, 20)); // Fallback to first 20 chars
+      }
+
+      // Build query that searches for any of the keywords in content
+      // Use simpler approach: search in any content field
+      const keywordFilter = keywords.length > 0 
+        ? keywords.map(keyword => `CONTAINS(LCASE(STR(?content)), "${keyword.replace(/"/g, '\\"')}")`).join(' || ')
+        : `CONTAINS(LCASE(STR(?content)), "${claimLower.substring(0, 30).replace(/"/g, '\\"')}")`;
+
+      const query = `
+        SELECT DISTINCT ?ual
+        WHERE {
+          GRAPH ?ual {
+            ?id ?p ?content
+            FILTER(${keywordFilter})
+          }
+        }
+        LIMIT ${limit}
+      `;
+
+      const result = await this.dkgClient.graph?.query?.(query, "SELECT");
+      const data = result?.data || (Array.isArray(result) ? result : []);
+      
+      const uals = data
+        .map(row => row.ual || row["?ual"]?.value)
+        .filter(ual => ual && ual.startsWith("did:dkg:") && !ual.includes("metadata:graph") && !ual.includes("current:graph"));
+      
+      dkgLogger.info("Found related UALs", { count: uals.length, claimPreview: claim.substring(0, 50), keywords });
+      return [...new Set(uals)]; // Remove duplicates
+    } catch (error) {
+      dkgLogger.warn("Failed to find related UALs", { error });
+      return [];
+    }
   }
 
 }

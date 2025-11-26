@@ -132,7 +132,7 @@ export class HealthClaimWorkflowService {
       // Store claim (fast operation)
       await db.insert(healthClaims).values(claimData);
 
-      // Step 3: Prepare data for DKG publishing
+      // Step 3: Prepare data for DKG publishing and find related assets
       progressReporter.report("dkg-preparation", 3, 5, "Preparing data for DKG publishing");
       const noteData = {
         claimId,
@@ -147,11 +147,14 @@ export class HealthClaimWorkflowService {
         analysis
       };
 
-      // Step 4: Publish to DKG (with timeout)
+      // Find related knowledge assets to connect to
+      const relatedUals = await this.dkgService.findRelatedUals(claim, 5);
+
+      // Step 4: Publish to DKG (with timeout), connecting to existing assets
       progressReporter.report("dkg-publishing", 4, 5, "Publishing to Decentralized Knowledge Graph");
-      logger.info("Step 4: Publishing to DKG");
+      logger.info("Step 4: Publishing to DKG", { relatedUalsCount: relatedUals.length });
       const publishResult = await WorkflowConfig.withTimeout(
-        this.dkgService.publishKnowledgeAsset(noteData, "public"),
+        this.dkgService.publishKnowledgeAsset(noteData, "public", relatedUals),
         effectiveTimeouts.dkgPublish,
         "DKG Publishing"
       );

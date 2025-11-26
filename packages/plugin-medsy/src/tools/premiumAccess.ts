@@ -228,36 +228,25 @@ async function generatePremiumAnalysis(
     const summaryText = cleanText(originalAnalysis.summary || '');
     const sources = originalAnalysis.sources?.map((source: string) => cleanText(source)) || [];
 
+    // Keep premium report concise to avoid token limit issues
+    const expertCommentary = summaryText || 'Current scientific evidence does not support this claim. More research is needed to fully understand the relationship.';
+    const evidenceStrength = confidence >= 0.8 ? "Strong" : confidence >= 0.6 ? "Moderate" : "Limited";
+    
     return `🩺 **EXPERT MEDICAL ANALYSIS REPORT**
 
 **Health Claim:** ${claimText}
 
-**AI Analysis Verdict:** ${verdict.toUpperCase()}
-**Confidence Level:** ${(confidence * 100).toFixed(1)}%
+| Metric | Value |
+|--------|-------|
+| Verdict | ${verdict.toUpperCase()} |
+| Confidence | ${(confidence * 100).toFixed(1)}% |
+| Evidence Strength | ${evidenceStrength} |
 
-🩺 **EXPERT MEDICAL COMMENTARY**
-${summaryText || 'Current scientific evidence does not support the idea that water alone can cure or "beat" cancer. Adequate hydration is important for overall health and can help manage treatment side-effects, but cancer treatment requires evidence-based medical approaches tailored to specific cancer types and stages.'}
+**Expert Commentary:** ${expertCommentary.substring(0, 300)}${expertCommentary.length > 300 ? '...' : ''}
 
-📊 **STATISTICAL RELIABILITY**
-• **Confidence Score:** ${(confidence * 100).toFixed(1)}% (scale: 0-100%)
-• **Evidence Strength:** ${confidence >= 0.8 ? "Strong" : confidence >= 0.6 ? "Moderate" : "Limited"}
-• **Source Quality:** ${sources.length} medical references evaluated
+**Sources:** ${sources.slice(0, 3).map((s: string, i: number) => `${i + 1}. ${s.substring(0, 60)}${s.length > 60 ? '...' : ''}`).join(' | ') || 'No sources provided'}
 
-🔍 **SOURCE CREDIBILITY ASSESSMENT**
-${sources.slice(0, 3).map((source: string, i: number) =>
-  `• **Source ${i + 1}:** ${source.substring(0, 50)}${source.length > 50 ? '...' : ''}`
-).join('\n') || "• No sources provided"}
-
-⚖️ **BALANCED LIMITATIONS**
-• Individual results may vary based on genetics and health conditions
-• Research is ongoing and evidence may evolve
-• This analysis is for educational purposes only
-
-💡 **CLINICAL IMPLICATIONS**
-Healthcare providers should focus on evidence-based cancer treatments while maintaining proper hydration as supportive care. Patients should discuss all treatment options with qualified oncologists.
-
-⚠️ **MEDICAL DISCLAIMER**
-This premium analysis provides enhanced medical insights but is not a substitute for professional medical advice, diagnosis, or treatment. Always consult qualified healthcare providers for personalized medical decisions.`;
+⚠️ **Disclaimer:** This analysis is for educational purposes only. Consult healthcare providers for personalized medical advice.`;
 
   } catch (error) {
     console.error('Error generating premium analysis:', error);

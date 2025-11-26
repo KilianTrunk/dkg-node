@@ -243,10 +243,11 @@ export interface IAIAnalysisService {
 
 export interface IDkgService {
   initialize(ctx?: any): Promise<void>;
-  publishKnowledgeAsset(content: any, privacy?: "private" | "public"): Promise<DkgPublishResult>;
+  publishKnowledgeAsset(content: any, privacy?: "private" | "public", relatedUals?: string[]): Promise<DkgPublishResult>;
   getKnowledgeAsset(ual: string): Promise<DkgAsset | null>;
   queryHealthAssets(sparqlQuery: string): Promise<any>;
   executeSparqlQuery(query: string): Promise<any>;
+  findRelatedUals(claim: string, limit?: number): Promise<string[]>;
 }
 
 export interface ITokenomicsService {

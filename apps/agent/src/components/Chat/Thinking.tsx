@@ -14,14 +14,19 @@ export default function ChatThinking({ speed = 250 }: { speed?: number }) {
     };
   }, [state, speed]);
 
+  const thinkingTexts = [
+    "Consulting medical literature",
+    "Reviewing case studies",
+    "Analyzing research data",
+    "Cross-referencing sources"
+  ];
+
   return (
     <ChatMessage icon="assistant">
       <ChatMessage.Content
         content={{
           type: "text",
-          text:
-            "Thinking" +
-            (state === 0 ? "." : state === 1 ? ".." : state === 2 ? "..." : ""),
+          text: thinkingTexts[state] + (state === 3 ? "..." : "."),
         }}
       />
     </ChatMessage>
