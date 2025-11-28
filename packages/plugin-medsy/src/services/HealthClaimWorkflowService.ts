@@ -48,7 +48,6 @@ export class HealthClaimWorkflowService {
     const cleanup = () => progressReporter.stop();
 
     try {
-      // Early validation
       if (!claim || claim.trim().length === 0) {
         throw new Error("Claim cannot be empty");
       }
@@ -56,7 +55,6 @@ export class HealthClaimWorkflowService {
         throw new Error("Agent identity is required");
       }
 
-      // Health check (fail fast if services are not ready)
       const healthCheck = await this.performHealthChecks();
       if (!healthCheck.overall) {
         throw new Error(`Service health check failed: ${JSON.stringify(healthCheck)}`);
@@ -79,11 +77,9 @@ export class HealthClaimWorkflowService {
       progressReporter.start();
       progressReporter.report("validation", 1, 5, "Validating request parameters and checking service health");
 
-      // Generate IDs upfront
       const claimId = `claim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const noteId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      // Check cache for similar claims
       const cacheKey = `analysis_${Buffer.from(claim.toLowerCase().trim()).toString('base64').substring(0, 50)}`;
       let analysis: any = null;
 
@@ -94,27 +90,24 @@ export class HealthClaimWorkflowService {
         }
       }
 
-      // Step 1: AI Analysis (with timeout and caching)
       progressReporter.report("ai-analysis", 1, 5, "Performing AI analysis of health claim");
       if (!analysis) {
-        logger.info("Step 1: Performing AI analysis (not cached)");
+        logger.info("Performing AI analysis");
         analysis = await WorkflowConfig.withTimeout(
           this.aiService.analyzeHealthClaim(claim, context),
           effectiveTimeouts.aiAnalysis,
           "AI Analysis"
         );
 
-        // Cache the result
         if (WorkflowConfig.caching.enabled) {
           this.cache.set(cacheKey, analysis);
         }
       } else {
-        logger.info("Step 1: Using cached AI analysis");
+        logger.info("Using cached AI analysis");
       }
 
-      // Step 2: Parallel database operations
       progressReporter.report("database-storage", 2, 5, "Storing claim and analysis data");
-      logger.info("Step 2: Storing claim and analysis in parallel");
+      logger.info("Storing claim and analysis");
 
       const claimData = {
         claimId,
@@ -129,10 +122,8 @@ export class HealthClaimWorkflowService {
         updatedAt: new Date(),
       };
 
-      // Store claim (fast operation)
       await db.insert(healthClaims).values(claimData);
 
-      // Step 3: Prepare data for DKG publishing and find related assets
       progressReporter.report("dkg-preparation", 3, 5, "Preparing data for DKG publishing");
       const noteData = {
         claimId,
@@ -147,12 +138,10 @@ export class HealthClaimWorkflowService {
         analysis
       };
 
-      // Find related knowledge assets to connect to
       const relatedUals = await this.dkgService.findRelatedUals(claim, 5);
 
-      // Step 4: Publish to DKG (with timeout), connecting to existing assets
       progressReporter.report("dkg-publishing", 4, 5, "Publishing to Decentralized Knowledge Graph");
-      logger.info("Step 4: Publishing to DKG", { relatedUalsCount: relatedUals.length });
+      logger.info("Publishing to DKG", { relatedUalsCount: relatedUals.length });
       const publishResult = await WorkflowConfig.withTimeout(
         this.dkgService.publishKnowledgeAsset(noteData, "public", relatedUals),
         effectiveTimeouts.dkgPublish,
@@ -160,11 +149,9 @@ export class HealthClaimWorkflowService {
       );
       const ual = publishResult.UAL;
 
-      // Step 5: Parallel operations - Store community note and stake tokens
       progressReporter.report("finalization", 5, 5, "Finalizing workflow with staking and note storage");
-      logger.info("Step 5: Finalizing with parallel operations");
+      logger.info("Finalizing workflow");
 
-      // Prepare staking data
       const stakeRequest = {
         noteId,
         amount: 1.0,
@@ -173,9 +160,7 @@ export class HealthClaimWorkflowService {
         reasoning: `AI analysis by ${agent.name}: ${analysis.summary.substring(0, 200)}...`
       };
 
-      // Run community note storage and staking in parallel
       const [noteResult, stakeResult] = await Promise.allSettled([
-        // Store community note
         db.insert(communityNotes).values({
         noteId,
         claimId,
@@ -187,7 +172,6 @@ export class HealthClaimWorkflowService {
         createdAt: new Date(),
         updatedAt: new Date(),
         }),
-        // Stake tokens (with timeout, potentially skipped in fast mode)
         WorkflowConfig.fastMode.skipStaking && WorkflowConfig.performanceMode === 'fast'
           ? Promise.resolve({ stakeId: `skipped_${Date.now()}` })
           : WorkflowConfig.withTimeout(
@@ -197,7 +181,6 @@ export class HealthClaimWorkflowService {
             )
       ]);
 
-      // Handle results
       if (noteResult.status === 'rejected') {
         errors.push(`Community note storage failed: ${noteResult.reason}`);
         logger.error("Community note storage failed", { error: noteResult.reason });

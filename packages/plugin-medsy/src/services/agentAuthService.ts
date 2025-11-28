@@ -36,7 +36,6 @@ export class AgentAuthService {
 
     logger.info("Initializing Agent Authentication Service...");
 
-    // Initialize with demo agents for testing
     this.initializeDemoAgents();
 
     this.initialized = true;
@@ -50,21 +49,17 @@ export class AgentAuthService {
    */
   extractAgentIdentity(ctx: any): AgentIdentity | null {
     try {
-      // Try to extract agent information from MCP context
       const agentId = this.extractAgentId(ctx);
       if (!agentId) {
         logger.warn("No agent ID found in context");
         return null;
       }
 
-      // Check if agent is registered
       let agent = this.agentRegistry.get(agentId);
       if (!agent) {
-        // Auto-register unknown agents with default wallet
         agent = this.registerAgent(agentId, ctx);
       }
 
-      // Update last active timestamp
       agent.lastActive = new Date();
 
       return agent;
@@ -74,31 +69,23 @@ export class AgentAuthService {
     }
   }
 
-  /**
-   * Extract agent ID from various context sources
-   */
   private extractAgentId(ctx: any): string | null {
-    // Try MCP agent context
     if (ctx?.agent?.id) {
       return ctx.agent.id;
     }
 
-    // Try session context
     if (ctx?.session?.agentId) {
       return ctx.session.agentId;
     }
 
-    // Try user context
     if (ctx?.user?.agentId) {
       return ctx.user.agentId;
     }
 
-    // Try headers or metadata
     if (ctx?.headers?.['x-agent-id']) {
       return ctx.headers['x-agent-id'];
     }
 
-    // Fallback to demo agent for development
     if (process.env.NODE_ENV === 'development') {
       return 'demo_agent_001';
     }
@@ -106,14 +93,8 @@ export class AgentAuthService {
     return null;
   }
 
-  /**
-   * Register a new agent
-   */
   private registerAgent(agentId: string, ctx: any): AgentIdentity {
-    // Extract agent name from context
     const name = this.extractAgentName(ctx) || `Agent ${agentId.slice(-4)}`;
-
-    // Assign wallet address based on agent ID (deterministic for demo)
     const walletAddress = this.generateWalletForAgent(agentId);
 
     const agent: AgentIdentity = {
@@ -123,7 +104,7 @@ export class AgentAuthService {
       capabilities: ['health_analysis', 'community_notes', 'staking', 'rewards'],
       registeredAt: new Date(),
       lastActive: new Date(),
-      trustScore: 0.5 // Start with neutral trust score
+      trustScore: 0.5
     };
 
     this.agentRegistry.set(agentId, agent);
@@ -137,9 +118,6 @@ export class AgentAuthService {
     return agent;
   }
 
-  /**
-   * Extract agent name from context
-   */
   private extractAgentName(ctx: any): string | null {
     if (ctx?.agent?.name) return ctx.agent.name;
     if (ctx?.session?.agentName) return ctx.session.agentName;
@@ -147,39 +125,24 @@ export class AgentAuthService {
     return null;
   }
 
-  /**
-   * Generate deterministic wallet address for agent
-   */
   private generateWalletForAgent(agentId: string): string {
-    // In production, agents would provide their own wallet addresses
-    // For demo purposes, generate deterministic addresses
     const hash = require('crypto').createHash('sha256').update(agentId).digest('hex');
     return `0x${hash.slice(0, 40)}`;
   }
 
-  /**
-   * Get agent by ID
-   */
   getAgent(agentId: string): AgentIdentity | null {
     return this.agentRegistry.get(agentId) || null;
   }
 
-  /**
-   * Get agent wallet address
-   */
   getAgentWallet(agentId: string): string | null {
     const agent = this.getAgent(agentId);
     return agent?.walletAddress || null;
   }
 
-  /**
-   * Update agent trust score based on performance
-   */
   updateTrustScore(agentId: string, accuracyScore: number): void {
     const agent = this.agentRegistry.get(agentId);
     if (agent) {
-      // Update trust score using exponential moving average
-      const alpha = 0.1; // Learning rate
+      const alpha = 0.1;
       agent.trustScore = agent.trustScore * (1 - alpha) + accuracyScore * alpha;
 
       logger.info("Agent trust score updated", {

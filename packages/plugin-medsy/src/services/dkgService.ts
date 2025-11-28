@@ -19,14 +19,9 @@ export class DkgService implements IDkgService {
       return;
     }
 
-    // Fallback to standalone initialization for CLI usage
     await this.initializeStandalone();
   }
 
-  /**
-   * Initialize standalone DKG client (for CLI scripts)
-   * Uses environment variables for configuration
-   */
   async initializeStandalone() {
     const endpoint = process.env.MEDSY_DKG_ENDPOINT || process.env.DKG_ENDPOINT || "http://localhost:8900";
     const blockchain = process.env.MEDSY_DKG_BLOCKCHAIN || process.env.DKG_BLOCKCHAIN || "otp:20430";
@@ -134,14 +129,12 @@ export class DkgService implements IDkgService {
         minimumNumberOfNodeReplications: DKG_CONFIG.publishing.minimumNumberOfNodeReplications,
       });
 
-      // Check for DKG API errors first
       if (result?.operation?.publish?.errorType || result?.operation?.publish?.errorMessage) {
         const errorType = result.operation.publish.errorType;
         const errorMessage = result.operation.publish.errorMessage;
         throw new Error(`DKG API Error: ${errorType} - ${errorMessage}`);
       }
 
-      // Validate that we actually have a UAL
       if (!result.UAL) {
         throw new Error("DKG API returned success but no UAL was provided");
       }
@@ -167,7 +160,6 @@ export class DkgService implements IDkgService {
       throw new Error("DKG client not initialized");
     }
 
-    // Skip mock UALs - these don't exist on real DKG
     if (ual.startsWith('did:dkg:demo:')) {
       dkgLogger.warn("Skipping mock UAL retrieval", { ual });
       return null;
@@ -231,19 +223,16 @@ export class DkgService implements IDkgService {
     }
 
     try {
-      // Extract key words from claim (remove common words)
       const claimLower = claim.toLowerCase();
       const keywords = claimLower
         .split(/\s+/)
         .filter(word => word.length > 3 && !['that', 'this', 'with', 'from', 'have', 'been', 'does', 'make', 'makes'].includes(word))
-        .slice(0, 3); // Use top 3 keywords
+        .slice(0, 3);
 
       if (keywords.length === 0) {
-        keywords.push(claimLower.substring(0, 20)); // Fallback to first 20 chars
+        keywords.push(claimLower.substring(0, 20));
       }
 
-      // Build query that searches for any of the keywords in content
-      // Use simpler approach: search in any content field
       const keywordFilter = keywords.length > 0
         ? keywords.map(keyword => `CONTAINS(LCASE(STR(?content)), "${keyword.replace(/"/g, '\\"')}")`).join(' || ')
         : `CONTAINS(LCASE(STR(?content)), "${claimLower.substring(0, 30).replace(/"/g, '\\"')}")`;
@@ -267,7 +256,7 @@ export class DkgService implements IDkgService {
         .filter(ual => ual && ual.startsWith("did:dkg:") && !ual.includes("metadata:graph") && !ual.includes("current:graph"));
 
       dkgLogger.info("Found related UALs", { count: uals.length, claimPreview: claim.substring(0, 50), keywords });
-      return [...new Set(uals)]; // Remove duplicates
+      return [...new Set(uals)];
     } catch (error) {
       dkgLogger.warn("Failed to find related UALs", { error });
       return [];
@@ -341,7 +330,7 @@ LIMIT 10
         author: item.author,
         genre: item.genre ? item.genre.replace(/^"|"$/g, '') : undefined,
         keywords: item.keywords ? item.keywords.replace(/^"|"$/g, '') : undefined,
-      })).filter((p: any) => p.headline); // Only return posts with headlines
+      })).filter((p: any) => p.headline);
 
       dkgLogger.info("Guardian query completed", {
         postsFound: posts.length,

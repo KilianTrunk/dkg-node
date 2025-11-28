@@ -1,16 +1,10 @@
 import type { AnalysisResult, IAIAnalysisService } from "../types";
 import { aiLogger } from "./Logger";
 
-/**
- * Clean text by removing HTML tags and converting to proper formatting
- */
 function cleanText(text: string): string {
   if (!text) return text;
 
-  // Remove HTML tags
   text = text.replace(/<[^>]*>/g, '');
-
-  // Convert HTML entities
   text = text.replace(/&nbsp;/g, ' ');
   text = text.replace(/&amp;/g, '&');
   text = text.replace(/&lt;/g, '<');
@@ -19,25 +13,16 @@ function cleanText(text: string): string {
   text = text.replace(/&#39;/g, "'");
   text = text.replace(/&#x27;/g, "'");
   text = text.replace(/&apos;/g, "'");
-
-  // Convert <br> and <br/> to newlines
   text = text.replace(/<br\s*\/?>/gi, '\n');
-
-  // Remove other common HTML artifacts
   text = text.replace(/<\/?p>/gi, '');
   text = text.replace(/<\/?div>/gi, '');
   text = text.replace(/<\/?span>/gi, '');
-
-  // Clean up extra whitespace and normalize line breaks
   text = text.replace(/\s+/g, ' ');
   text = text.replace(/\n\s+/g, '\n');
   text = text.trim();
 
   return text;
 }
-
-// LLM provider will be accessed dynamically at runtime
-// This avoids import issues while still using the agent's configured LLM
 
 /**
  * AI-powered health claim analysis service using the agent's configured LLM
@@ -47,7 +32,6 @@ export class AIAnalysisService implements IAIAnalysisService {
   private llmInitialized: boolean = false;
 
   async initializeAIClient() {
-    // Lazy initialization - just mark that we should try to initialize later
     aiLogger.info("AI Analysis Service registered for lazy LLM initialization");
   }
 
@@ -55,7 +39,6 @@ export class AIAnalysisService implements IAIAnalysisService {
     if (this.llmInitialized) return;
 
     try {
-      // Try to access the global LLM provider that's set up by the agent
       const globalLLM = (globalThis as any).llmProvider;
       if (globalLLM) {
         this.llm = globalLLM;
@@ -68,7 +51,6 @@ export class AIAnalysisService implements IAIAnalysisService {
         return;
       }
 
-      // Fallback: try dynamic import and initialize LLM directly
       try {
         const { llmProvider } = await import("../../../../apps/agent/src/shared/chat.js" as any);
         this.llm = await llmProvider();
@@ -84,13 +66,12 @@ export class AIAnalysisService implements IAIAnalysisService {
       }
     } catch (error) {
       aiLogger.error("Failed to initialize LLM", { error });
-      this.llmInitialized = true; // Don't try again
+      this.llmInitialized = true;
       throw error;
     }
   }
 
   async analyzeHealthClaim(claim: string, context?: string): Promise<AnalysisResult> {
-    // Ensure LLM is initialized (lazy loading)
     if (!this.llmInitialized) {
       try {
         await this.ensureLLM();
@@ -112,7 +93,6 @@ export class AIAnalysisService implements IAIAnalysisService {
       throw new Error("LLM not initialized");
     }
 
-    // Create a structured prompt for health claim analysis
     const systemPrompt = `You are a medical fact-checking AI. Analyze health claims and respond ONLY with valid JSON.
 
 Verdict types:
@@ -158,14 +138,11 @@ Your response must be parseable JSON only.`;
         contentLength: response?.content?.length || 0
       });
 
-      // Extract content more robustly
       let content: string;
       if (typeof response.content === 'string') {
         content = response.content;
       } else if (response.content && typeof response.content === 'object') {
-        // Handle different response formats
         if (Array.isArray(response.content)) {
-          // Sometimes LLM returns array of message parts
           content = response.content.map((part: any) =>
             typeof part === 'string' ? part : part.text || JSON.stringify(part)
           ).join('');
@@ -208,14 +185,12 @@ Your response must be parseable JSON only.`;
         throw new Error("Invalid response structure from LLM - missing required fields");
       }
 
-      // Ensure verdict is valid
       const validVerdicts = ["true", "false", "misleading", "uncertain"];
       if (!validVerdicts.includes(parsed.verdict)) {
         aiLogger.warn("Invalid verdict value", { verdict: parsed.verdict });
         parsed.verdict = "uncertain";
       }
 
-      // Clean HTML tags from AI-generated content
       const cleanSummary = cleanText(parsed.summary);
       const cleanSources = Array.isArray(parsed.sources)
         ? parsed.sources.map((source: any) => cleanText(source))
@@ -223,7 +198,7 @@ Your response must be parseable JSON only.`;
 
       return {
         verdict: parsed.verdict,
-        confidence: Math.max(0, Math.min(1, parsed.confidence || 0.5)), // Clamp to 0-1
+        confidence: Math.max(0, Math.min(1, parsed.confidence || 0.5)),
         summary: cleanSummary,
         sources: cleanSources
       };

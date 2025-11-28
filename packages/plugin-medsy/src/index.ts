@@ -55,11 +55,9 @@ export default defineDkgPlugin((ctx, mcp, api) => {
 
   console.log(`MEDSY_DATABASE_PATH found: ${!!process.env.MEDSY_DATABASE_PATH}`);
 
-  // Initialize services if configuration is provided
   const config: MedsyConfig = loadConfig();
   console.log(`Initializing Medsy services... (${Date.now()})`);
 
-  // Initialize services
   initializeServices(config, ctx)
     .then((container) => {
       serviceContainer = container;
@@ -69,7 +67,6 @@ export default defineDkgPlugin((ctx, mcp, api) => {
       console.log(`   - AI/LLM: Using agent's configuration (apps/agent)`);
       console.log(`   - DKG Endpoint: ${config.dkg?.endpoint || 'Not configured'}`);
 
-      // Register MCP tools using modular functions
       const aiService = container.get<IAIAnalysisService>("aiService");
       const dkgService = container.get<IDkgService>("dkgService");
       const tokenomicsService = container.get<ITokenomicsService>("tokenomicsService");
@@ -81,12 +78,11 @@ export default defineDkgPlugin((ctx, mcp, api) => {
       registerPublishNoteTool(mcp, ctx, dkgService, db);
       registerGetNoteTool(mcp, ctx, dkgService, aiService, literatureService, db);
       registerStakeTokensTool(mcp, ctx, tokenomicsService, db);
-      registerPremiumAccessTool(mcp, ctx, tokenomicsService, db); // Use tokenomics service like staking
+      registerPremiumAccessTool(mcp, ctx, tokenomicsService, db);
       registerGetPremiumAnalysisTool(mcp, ctx, literatureService, db);
       registerCompletePaymentTool(mcp, ctx, paymentService, db);
       registerDistributeRewardsTool(mcp, ctx, tokenomicsService);
 
-      // Initialize x402 service (lazy load to avoid import issues)
       const initializeX402 = async () => {
         const { X402PaymentService } = await import("./services/x402PaymentService.js");
         const x402Service = new X402PaymentService();
@@ -98,7 +94,6 @@ export default defineDkgPlugin((ctx, mcp, api) => {
       console.error("Medsy Plugin initialization failed:", error);
     });
 
-  // Register API routes
   (async () => {
     const { registerAllRoutes } = await import("./routes/index.js");
     registerAllRoutes(api, serviceContainer);
