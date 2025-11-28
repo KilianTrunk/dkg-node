@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./apps/agent/src/assets/medsy-banner.webp" alt="Medsy – A Decentralized Guardian Against Health Misinformation" width="100%" />
+  <img src="https://repository-images.githubusercontent.com/1097224039/e5e63f74-8cf8-4c4d-98ec-a60bd50639a2" alt="Medsy – A Decentralized Guardian Against Health Misinformation" width="100%" />
 </p>
 
 # Medsy💊: The trust layer for AI-powered health information
