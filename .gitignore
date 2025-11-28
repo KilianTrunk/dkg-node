@@ -11,6 +11,12 @@ node_modules
 .env.development.local
 .env.test.local
 .env.production.local
+.env.medsy
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
 
 # Testing
 coverage
