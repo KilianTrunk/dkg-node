@@ -1,311 +1,287 @@
-# DKG Node
+<p align="center">
+  <img src="./apps/agent/src/assets/medsy-banner.webp" alt="Medsy – A Decentralized Guardian Against Health Misinformation" width="100%" />
+</p>
 
-A comprehensive monorepo for building Decentralized Knowledge Graph (DKG) applications with a modern tech stack including Expo, Drizzle ORM, SQLite, and MCP (Model Context Protocol) integration.
+# Medsy💊: The trust layer for AI-powered health information
 
-## 🏗️ Architecture Overview
+Medsy is a production-ready **decentralized guardian against health misinformation** built on the OriginTrail DKG
+and NeuroWeb. It autonomously verifies health claims against trusted medical sources, structures findings into
+JSON‑LD community notes, and publishes them as cryptographically‑signed Knowledge Assets on the global DKG network.
 
-This project consists of:
+Our system combines:
 
-- **Agent App**: A full-stack DKG agent with Expo UI and MCP server
-- **Plugin System**: Modular plugins for extending functionality
-- **Database Layer**: SQLite with Drizzle ORM for data persistence
-- **Authentication**: OAuth-based authentication system
-- **API Server**: Express-based API with Swagger documentation
+- 🤖 **Autonomous AI agent workflows** via MCP protocol  
+- 🔬 **Multi‑provider AI analysis** (OpenAI, Anthropic, Groq, Mistral)  
+- 📚 **Decentralized community notes** with JSON‑LD structure  
+- 💰 **TRAC token staking** for consensus building  
+- 💎 **x402 micropayments** for premium medical insights  
+- 🏆 **Agent reward system** for accurate fact‑checking  
+- 🔗 **On‑chain verification** on NeuroWeb testnet  
+- 📊 **Real‑time metrics dashboard** and health monitoring  
+- 🤝 **Agent‑to‑agent collaboration** via shared DKG memory  
+
+---
+
+## 🧩 Monorepo Overview
+
+This repository is a **DKG Node monorepo** that ships:
+
+- **Medsy Agent App** (`apps/agent`): Expo web app + MCP server + REST API  
+- **Medsy Plugin** (`packages/plugin-medsy`): domain logic for health claims, staking, rewards and x402  
+- **Additional Plugins** (`packages/plugin-*`): reusable DKG plugins  
+- **Database Layer**: SQLite + Drizzle ORM for both agent and Medsy plugin  
+- **Authentication & OAuth**: secure access control for human users and agents  
+
+Medsy implements a full **Agent → Knowledge → Trust** stack:
+
+- **Agent layer** – autonomous health verification workflows exposed via MCP tools and HTTP APIs.  
+- **Knowledge layer** – JSON‑LD Knowledge Assets on OriginTrail DKG (DKG.js + Edge Node).  
+- **Trust layer** – TRAC token staking, on‑chain rewards and x402 micropayments on NeuroWeb.  
+
+---
+
+## 🏗️ Architecture
+
+### Medsy Agent (`apps/agent`)
+
+- Expo Router web UI for submitting and reviewing health claims  
+- Node.js server exposing:
+  - MCP server (Model Context Protocol)
+  - REST API under `/health/*`
+  - OAuth authentication and session management  
+- Drizzle ORM + SQLite for user, auth and session data  
+
+### Medsy Plugin (`packages/plugin-medsy`)
+
+- **Core services**
+  - `AIAnalysisService` – multi‑provider LLM health claim analysis  
+  - `DkgService` – JSON‑LD publishing, UAL resolution, SPARQL queries  
+  - `TokenomicsService` – TRAC staking, reward calculation, consensus  
+  - `PaymentService` / `X402PaymentService` – x402 micropayments  
+  - `MetricsService` – system health, staking and premium metrics  
+  - `WorkflowOrchestrator` – end‑to‑end autonomous workflows  
+- **MCP tools** (9 registered):
+  - `autonomous-health-claim-analysis`
+  - `analyze-claim`
+  - `publish-note`
+  - `get-note`
+  - `stake-tokens`
+  - `access-premium-health-insights`
+  - `get-premium-analysis`
+  - `distribute-rewards`
+  - `complete-premium-payment`
+
+### Data model (Medsy plugin)
+
+- `health_claims` – incoming claims and their analysis status  
+- `community_notes` – structured, DKG‑linked JSON‑LD health notes  
+- `stakes` – TRAC stakes for/against a note  
+- `premium_access` – x402‑paid premium access records  
+- `agent_rewards` – rewards per agent and note  
+
+---
 
 ## 📋 Requirements
 
-- **Node.js** >= 22
-- **npm** package manager
-- **Turbo** CLI (install globally)
+- **Node.js** ≥ 22  
+- **npm**  
+- **Turbo** CLI (installed globally)  
+- Access to an OriginTrail DKG Edge Node (local or remote)  
+- TRAC tokens on NeuroWeb testnet for staking and payments  
 
 ```bash
 npm i -g turbo
 ```
 
-## 🚀 Quick Start
+---
 
-### 1. Install & Build
+## 🚀 Getting Started
+
+### 1. Install & build (monorepo root)
 
 ```bash
 npm install
 npm run build
 ```
 
-### 2. Environment Variables Setup
+### 2. Configure environment
 
-Before running the project setup, you'll need to configure the following environment variables. The setup script will prompt you for these values, but you can also prepare them in advance:
+#### Agent (root `.env`)
 
-#### Required Variables
+- **`DATABASE_URL`** – SQLite file name (e.g. `dkg.db`)  
+- **`OPENAI_API_KEY`** – API key for default LLM provider (optional if using others)  
+- **`DKG_PUBLISH_WALLET`** – private key for publishing to DKG / paying TRAC fees  
+- **`DKG_BLOCKCHAIN`** – e.g. `otp:20430` (NeuroWeb testnet)  
+- **`DKG_OTNODE_URL`** – OT-node / Edge Node URL (e.g. `https://v6-pegasus-node-02.origin-trail.network:8900`)  
 
-- **`DATABASE_URL`**: Database name for SQLite (e.g., `dkg.db`)
-- **`OPENAI_API_KEY`**: Your OpenAI API key for LLM integration
-- **`DKG_PUBLISH_WALLET`**: Private key for publishing to the DKG blockchain. This is used for:
-  - Paying native token fees for blockchain transactions
-  - Paying TRAC tokens for publishing to the DKG
-  - Securing your node identity (keep your private keys secure!)
-
-#### Optional Variables (with defaults)
-
-- **`DKG_BLOCKCHAIN`**: Blockchain network identifier. Options:
-  - Mainnet: `otp:2043`
-  - Testnet: `otp:20430`
-  - Default: `hardhat1:31337` (local development)
-- **`DKG_OTNODE_URL`**: OT-node server URL. Options:
-  - **Testnet** (safe testing with mock tokens): `https://v6-pegasus-node-02.origin-trail.network:8900`
-  - **Mainnet** (production DKG interactions): `https://positron.origin-trail.network`
-  - **Local development**: `http://localhost:8900` (default)
-- **`PORT`**: Server port (default: `9200`)
-- **`EXPO_PUBLIC_APP_URL`**: Public app URL (default: `http://localhost:9200`)
-- **`EXPO_PUBLIC_MCP_URL`**: MCP server URL (default: `http://localhost:9200`)
-
-### 3. Project Setup
+#### Medsy plugin (`packages/plugin-medsy/.env.medsy`)
 
 ```bash
-cd apps/agent
-npm run build:scripts
-npm run script:setup
+# Database
+MEDSY_DATABASE_PATH="./medsy.db"
+
+# AI
+MEDSY_AI_PROVIDER="groq"
+MEDSY_AI_MODEL="mixtral-8x7b-32768"
+MEDSY_AI_TEMPERATURE="0.7"
+MEDSY_AI_MAX_TOKENS="4000"
+
+# DKG
+MEDSY_DKG_ENDPOINT="http://localhost:8900"
+MEDSY_DKG_BLOCKCHAIN="otp:20430"
+
+# Tokenomics
+MEDSY_TRAC_TOKEN_ADDRESS="0xFfFFFFff00000000000000000000000000000001"
+MEDSY_REWARD_MULTIPLIER="1.0"
+
+# x402 Micropayments
+MEDSY_PAYMENT_ENABLED="true"
+MEDSY_STABLECOIN_ADDRESS="0xA0b86a33E6441e88C5F2712C3E9b74F5b6c6C6b7"
+MEDSY_MICROPAYMENT_THRESHOLD="0.01"
+
+# Logging
+LOG_LEVEL="info"
 ```
 
-The setup script will:
+### 3. Bootstrap databases
 
-- Prompt for required environment variables
-- Create `.env` and `.env.development.local` files
-- Set up the SQLite database with migrations
-- Create an admin user (username: `admin`, password: `admin123`)
+```bash
+# Agent DB
+cd apps/agent
+npm run build:scripts
+npm run script:setup   # creates admin user and SQLite DB
 
-### 4. Start Development
+# Medsy DB
+cd ../../packages/plugin-medsy
+npm run db:migrate
+```
+
+### 4. Run in development
+
+From repo root:
 
 ```bash
 npm run dev
 ```
 
-That's it! Your DKG agent is now running with:
+This starts:
 
-- **Frontend**: [http://localhost:8081](http://localhost:8081) (Expo app)
-- **Backend**: [http://localhost:9200](http://localhost:9200) (MCP server + API)
-- **Database**: SQLite with Drizzle Studio available
+- **Frontend**: `http://localhost:8081` (Expo web app)  
+- **Backend**: `http://localhost:9200` (MCP server + REST API)  
+- **Medsy API**: `http://localhost:9200/health/*`  
+- **Metrics**: `http://localhost:9200/health/metrics`  
 
-## 🗄️ Database Management
+---
 
-### Database Schema
+## 🔬 Medsy Health Verification API
 
-The application uses SQLite with the following tables:
-
-- **`users`**: User authentication and authorization
-- **`oauth_clients`**: OAuth client management
-- **`oauth_codes`**: OAuth authorization codes
-- **`oauth_tokens`**: OAuth access tokens
-
-### Database Commands
+### Health claims analysis
 
 ```bash
-# Generate new migrations
-npm run build:migrations
-
-# View database in Drizzle Studio
-npm run drizzle:studio
-
-# Create new user/token
-npm run script:createUser
-npm run script:createToken
+# Analyze a health claim autonomously
+curl -X POST http://localhost:9200/health/claims \
+  -H "Content-Type: application/json" \
+  -d '{"claim": "Vitamin C cures COVID-19"}'
 ```
 
-### Drizzle Studio
+Example response (truncated):
 
-Access your database through the web interface:
+```json
+{
+  "success": true,
+  "claimId": "claim_123",
+  "analysis": {
+    "verdict": "false",
+    "confidence": 0.92,
+    "sources": ["WHO", "CDC", "PubMed"]
+  },
+  "ual": "did:dkg:otp:20430/0x123...",
+  "transactionHash": "0x456..."
+}
+```
+
+### Community notes & consensus
 
 ```bash
-npm run drizzle:studio
+# Get published community notes
+curl http://localhost:9200/health/notes
+
+# View staking consensus for a note
+curl http://localhost:9200/health/stakes/note_456
+
+# Check agent rewards distribution
+curl http://localhost:9200/health/rewards
 ```
 
-Then open [https://local.drizzle.studio](https://local.drizzle.studio)
-
-## 🧩 Plugin Development
-
-### Creating MCP/API Plugins
-
-#### 1. Generate Plugin Package
+### Premium access & payments (x402)
 
 ```bash
-turbo gen plugin
-# Name: plugin-<your-name>
+# Request premium access
+curl -X POST http://localhost:9200/health/premium \
+  -H "Content-Type: application/json" \
+  -d '{"noteId": "note_456", "paymentAmount": 0.01}'
+
+# Complete x402 payment
+curl -X POST http://localhost:9200/health/x402/complete/payment_123 \
+  -H "Content-Type: application/json" \
+  -d '{"transactionHash": "0x789..."}'
 ```
 
-#### 2. Develop Your Plugin
-
-Edit `packages/plugin-<your-name>/src/index.ts`:
-
-```typescript
-import { defineDkgPlugin } from "@dkg/plugins";
-
-export default defineDkgPlugin((ctx, mcp, api) => {
-  // Register MCP tools/resources
-  mcp.tools.register("myTool", {
-    // Tool implementation
-  });
-
-  // Register API routes
-  api.get("/my-endpoint", (req, res) => {
-    // Route implementation
-  });
-});
-```
-
-#### 3. Use in Agent
+### Metrics & monitoring
 
 ```bash
-cd apps/agent
-npm install --save @dkg/plugin-<your-name>
+# System health and performance metrics
+curl http://localhost:9200/health/metrics
+
+# Claims activity metrics
+curl http://localhost:9200/health/metrics/claims
+
+# Staking and tokenomics analytics
+curl http://localhost:9200/health/metrics/staking
+
+# Premium access revenue tracking
+curl http://localhost:9200/health/metrics/premium
 ```
 
-Then register in `src/index.ts`:
+---
 
-```typescript
-import myPlugin from "@dkg/plugin-<your-name>";
-
-// In createPluginServer function
-plugins: [myPlugin];
-```
-
-### Plugin Context
-
-Plugins receive three injected arguments:
-
-- **`ctx`**: DKG environment context (logger, DKG client, etc.)
-- **`mcp`**: MCP Server instance for registering tools/resources
-- **`api`**: Express server for API routes
-
-## 📱 Available Scripts
+## 📱 Available scripts (root)
 
 ### Development
 
 ```bash
-npm run dev              # Start both app and server
-npm run dev:app          # Start Expo app only
-npm run dev:server       # Start MCP server only
+npm run dev              # Start app + server
+npm run dev:app          # Expo app only
+npm run dev:server       # MCP server only
 ```
 
-### Building
+### Build
 
 ```bash
 npm run build            # Build all packages
-npm run build:server     # Build server code
 npm run build:web        # Build web app
+npm run build:server     # Build server
 npm run build:scripts    # Build utility scripts
 npm run build:migrations # Generate database migrations
 ```
 
 ### Testing
 
-The project includes three testing layers for comprehensive coverage:
-
 ```bash
-# API Tests - Individual plugin/endpoint testing
-npm run test:api         # Run all plugin API tests
-
-# Integration Tests - Cross-plugin interaction testing
-npm run test:integration # Run integration tests
-
-# End-to-end user interface testing
-npm run test:e2e         # Run Playwright tests
-
-# Run all tests
-npm test                 # Run API, integration, and E2E tests
+npm run test:api         # Plugin / API tests
+npm run test:integration # Cross-plugin integration tests
+npm run test:e2e         # Playwright UI tests
+npm test                 # Run all tests
 ```
 
-## 🚀 Production Deployment
-
-### Build for Production
-
-```bash
-npm run build            # Build all packages
-npm run build:web        # Build web app
-npm run build:server     # Build server
-```
-
-### Run Production Server
-
-```bash
-cd apps/agent
-node dist/index.js
-```
-
-## 📦 Package Management
-
-### Adding Dependencies
-
-```bash
-# Add to specific package
-cd packages/your-package
-npm install --save package-name
-
-# Add to app
-cd apps/agent
-npm install --save package-name
-```
-
-### Using Local Packages
-
-```bash
-# Install local package in another package
-npm install --save @dkg/your-package-name
-```
-
-## 🔍 Troubleshooting
-
-### Common Issues
-
-#### Build Failures
-
-```bash
-# Clean and rebuild
-rm -rf node_modules package-lock.json
-npm install
-npm run build
-```
-
-#### Database Issues
-
-```bash
-# Regenerate migrations
-npm run build:migrations
-
-# Reset database
-rm *.db
-npm run script:setup
-```
-
-#### TypeScript Errors
-
-```bash
-# Check types
-npm run check-types
-
-# Reinstall dependencies
-npm install
-npm run build
-```
-
-### Getting Help
-
-- Check the [Turborepo documentation](https://turborepo.com/docs)
-- Review existing plugins in `packages/plugin-*`
-- Check the agent app README in `apps/agent/README.md`
-
-## 📚 Useful Links
-
-- [Turborepo Documentation](https://turborepo.com/docs)
-- [Expo Documentation](https://docs.expo.dev/)
-- [Drizzle ORM](https://orm.drizzle.team/)
-- [Model Context Protocol](https://modelcontextprotocol.io/)
-- [DKG.js Documentation](https://docs.origintrail.io/dkg.js/)
+---
 
 ## 🤝 Contributing
 
-1. Follow the existing code structure
-2. Use `turbo gen` for new packages/apps
-3. Run `turbo format check-types lint build` before committing
-4. Follow the established patterns in existing plugins
+- Follow the existing monorepo structure and TypeScript strict mode  
+- Use `turbo gen` for new packages/apps  
+- Run `turbo format check-types lint build` before committing  
+- Keep MCP tool schemas and API contracts in sync with implementation  
 
 ## 📄 License
 
