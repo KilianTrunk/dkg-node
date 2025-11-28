@@ -25,8 +25,8 @@ export default function HeaderLogo(props: {
       <Image
         source={props.image}
         style={{
-          width: 64,
-          height: 32,
+          width: 128,
+          height: 64,
           marginRight: 8,
           marginLeft: 16,
           display: "flex",

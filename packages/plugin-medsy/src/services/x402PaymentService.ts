@@ -64,7 +64,6 @@ export class X402PaymentService {
     const tokenConfig = getTokenConfig();
     logger.info("✅ x402 Payment Service initialized", {
       network: this.blockchainProvider.getNetworkName(),
-      supportedCurrencies: ["USDC", "USDT", "DAI"]
     });
   }
 
@@ -81,8 +80,8 @@ export class X402PaymentService {
 
     const paymentId = `x402_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Default to USDC for micropayments
-    const currency = "USDC";
+    // Use TRAC tokens for all payments
+    const currency = "TRAC";
     const amountString = amount.toFixed(6); // Micropayment precision
 
     const paymentRequest: X402PaymentResponse = {
@@ -152,16 +151,16 @@ export class X402PaymentService {
     let newStatus: string = "payment_pending";
     let verifiedTransactionHash: string | undefined;
 
-    // Verify transaction if hash provided
     if (transactionHash) {
-      try {
-        await this.verifyPaymentTransaction(transactionHash, payment.amount, payerAddress);
-        newStatus = "payment_completed";
-        verifiedTransactionHash = transactionHash;
-      } catch (error) {
-        logger.warn("Payment verification failed", { paymentId, transactionHash, error });
-        newStatus = "payment_pending";
+      const verified = await this.verifyPaymentTransaction(transactionHash, payment.amount, payerAddress);
+      if (!verified) {
+        logger.error("CRITICAL: Payment verification FAILED", { paymentId, transactionHash });
+        throw new Error(`Payment verification failed for transaction ${transactionHash}`);
       }
+      newStatus = "payment_completed";
+      verifiedTransactionHash = transactionHash;
+    } else {
+      throw new Error("Transaction hash required for payment processing");
     }
 
     // Update payment in database

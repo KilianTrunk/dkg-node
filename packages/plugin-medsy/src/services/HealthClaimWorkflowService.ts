@@ -191,7 +191,7 @@ export class HealthClaimWorkflowService {
         WorkflowConfig.fastMode.skipStaking && WorkflowConfig.performanceMode === 'fast'
           ? Promise.resolve({ stakeId: `skipped_${Date.now()}` })
           : WorkflowConfig.withTimeout(
-              this.tokenomicsService.stakeTokens(stakeRequest),
+              this.tokenomicsService.stakeTokens(stakeRequest, agent),
               effectiveTimeouts.tokenStake,
               "Token Staking"
             )
@@ -224,6 +224,7 @@ export class HealthClaimWorkflowService {
         noteId,
         ual,
         stakeId,
+        analysis,
         errors,
         executionTime,
         progress: {

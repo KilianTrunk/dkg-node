@@ -41,6 +41,7 @@
     "tsup": "^8.5.0",
     "tsx": "^4.20.5",
     "turbo": "^2.5.5",
+    "turbo-linux-64": "^2.5.5",
     "typescript": "^5.8.3"
   },
   "engines": {
@@ -60,6 +61,7 @@
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "^4.52.5",
-    "@node-rs/argon2-linux-x64-gnu": "^1.7.0"
+    "@node-rs/argon2-linux-x64-gnu": "^1.7.0",
+    "turbo-linux-64": "^2.5.5"
   }
 }

@@ -14,6 +14,7 @@ export interface AgentIdentity {
   agentId: string;
   name: string;
   walletAddress: string;
+  privateKey?: string;
   capabilities: string[];
   registeredAt: Date;
   lastActive: Date;

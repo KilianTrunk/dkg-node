@@ -123,21 +123,17 @@ export default function ChatInput({
     backgroundColor: focusValue.value > 0 ? 'rgba(255, 153, 153, 0.12)' : 'rgba(255, 153, 153, 0.08)',
   }));
 
-  // Apply web-specific styles to remove browser defaults
   useEffect(() => {
     if (isWeb && inputRef.current) {
-      // Get the underlying DOM element
       const inputElement = (inputRef.current as any)._nativeTag ||
-                          (inputRef.current as any).getNativeScrollRef?.() ||
-                          inputRef.current;
+        (inputRef.current as any).getNativeScrollRef?.() ||
+        inputRef.current;
 
       if (inputElement && typeof document !== 'undefined') {
-        // Use setTimeout to ensure DOM is ready
         setTimeout(() => {
           // Find the actual input element in the DOM
           const domElement = document.querySelector('input') as HTMLInputElement;
           if (domElement) {
-            // Apply styles directly to override RN Web defaults
             domElement.style.setProperty('background-color', 'rgba(255, 153, 153, 0.08)', 'important');
             domElement.style.setProperty('-webkit-appearance', 'none', 'important');
             domElement.style.setProperty('-moz-appearance', 'textfield', 'important');
@@ -146,7 +142,6 @@ export default function ChatInput({
             domElement.style.setProperty('box-shadow', 'none', 'important');
             domElement.style.setProperty('outline', 'none', 'important');
 
-            // Handle focus/blur events
             const handleFocus = () => {
               domElement.style.setProperty('background-color', 'rgba(255, 153, 153, 0.12)', 'important');
             };
@@ -157,7 +152,6 @@ export default function ChatInput({
             domElement.addEventListener('focus', handleFocus);
             domElement.addEventListener('blur', handleBlur);
 
-            // Also add global CSS to catch any other inputs
             const existingStyle = document.getElementById('medsy-input-styles');
             if (!existingStyle) {
               const style = document.createElement('style');
@@ -273,6 +267,8 @@ export default function ChatInput({
           />
         </View>
       </Animated.View>
+
+      {/* Tools section */}
       <View style={styles.inputTools}>
         <Button
           disabled={disabled || isUploading}
@@ -284,25 +280,19 @@ export default function ChatInput({
           testID="chat-attach-file-button"
           onPress={() => {
             setIsUploading(true);
-            DocumentPicker.getDocumentAsync({
-              base64: true,
-              multiple: true,
-            })
-              .then((r) => {
-                if (!r.assets) return [];
-                return onUploadFiles(r.assets);
-              })
-              .then((newFiles) =>
-                setSelectedFiles((oldFiles) => [
-                  ...new Set([...oldFiles, ...newFiles]),
-                ]),
+            DocumentPicker.getDocumentAsync({ base64: true, multiple: true })
+              .then((r) => (r.assets ? onUploadFiles(r.assets) : []))
+              .then((files) =>
+                setSelectedFiles((prev) => [
+                  ...new Set([...prev, ...files]),
+                ])
               )
-              .catch((error) => onUploadError?.(toError(error)))
+              .catch((err) => onUploadError?.(toError(err)))
               .finally(() => setIsUploading(false));
           }}
         />
         <Popover
-          from={(isOpen, setIsOpen) => (
+          from={(open, toggle) => (
             <Button
               color="secondary"
               flat
@@ -310,9 +300,9 @@ export default function ChatInput({
               style={{
                 height: "100%",
                 aspectRatio: 1,
-                backgroundColor: isOpen ? colors.card : "transparent",
+                backgroundColor: open ? colors.card : "transparent",
               }}
-              onPress={() => setIsOpen((o) => !o)}
+              onPress={() => toggle((v) => !v)}
             />
           )}
         >
@@ -327,10 +317,7 @@ export default function ChatInput({
   );
 }
 
-ChatInput.FilesSelected = ChatInputFilesSelected;
-ChatInput.ToolsSelector = ChatInputToolsSelector;
-ChatInput.AttachmentChip = ChatInputAttachmentChip;
-
+// Styles
 const styles = StyleSheet.create({
   inputContainer: {
     position: "relative",
@@ -370,3 +357,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
 });
+
+ChatInput.FilesSelected = ChatInputFilesSelected;
+ChatInput.ToolsSelector = ChatInputToolsSelector;
+ChatInput.AttachmentChip = ChatInputAttachmentChip;

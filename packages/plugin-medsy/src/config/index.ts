@@ -9,12 +9,6 @@ export const MedsyConfigSchema = z.object({
   database: z.object({
     path: z.string().default("./medsy.db"),
   }),
-  ai: z.object({
-    provider: z.enum(["openai", "anthropic", "groq", "mistral"]).default("openai"),
-    model: z.string().optional(),
-    temperature: z.number().min(0).max(1).default(0.7),
-    maxTokens: z.number().positive().default(4000),
-  }).optional(),
   dkg: z.object({
     endpoint: z.string().optional(),
     blockchain: z.string().optional(),
@@ -40,15 +34,11 @@ export type MedsyConfig = z.infer<typeof MedsyConfigSchema>;
 
 /**
  * Default configuration
+ * Note: AI/LLM configuration is managed by apps/agent, not by this plugin
  */
 export const DEFAULT_CONFIG: MedsyConfig = {
   database: {
     path: "./medsy.db",
-  },
-  ai: {
-    provider: "openai",
-    temperature: 0.7,
-    maxTokens: 4000,
   },
   dkg: {
     epochsNum: 5,
@@ -76,25 +66,6 @@ export function loadConfig(): MedsyConfig {
   // Database configuration
   if (process.env.MEDSY_DATABASE_PATH) {
     config.database = { path: process.env.MEDSY_DATABASE_PATH };
-  }
-
-  // AI configuration
-  if (process.env.MEDSY_AI_PROVIDER) {
-    config.ai = {
-      provider: process.env.MEDSY_AI_PROVIDER as any,
-      temperature: config.ai?.temperature ?? DEFAULT_CONFIG.ai!.temperature,
-      maxTokens: config.ai?.maxTokens ?? DEFAULT_CONFIG.ai!.maxTokens,
-      model: process.env.MEDSY_AI_MODEL ?? config.ai?.model,
-    };
-  }
-  if (process.env.MEDSY_AI_MODEL && config.ai) {
-    config.ai.model = process.env.MEDSY_AI_MODEL;
-  }
-  if (process.env.MEDSY_AI_TEMPERATURE && config.ai) {
-    config.ai.temperature = parseFloat(process.env.MEDSY_AI_TEMPERATURE);
-  }
-  if (process.env.MEDSY_AI_MAX_TOKENS && config.ai) {
-    config.ai.maxTokens = parseInt(process.env.MEDSY_AI_MAX_TOKENS);
   }
 
   // DKG configuration

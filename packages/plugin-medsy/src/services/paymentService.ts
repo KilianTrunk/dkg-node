@@ -37,7 +37,6 @@ export class PaymentService {
     console.log("✅ Premium Payment Service initialized with x402:", {
       network: this.blockchainProvider.getNetworkName(),
       x402Enabled: true,
-      supportedCurrencies: ["USDC", "USDT", "DAI"]
     });
   }
 

@@ -47,7 +47,8 @@ const createTransport = (
     },
   );
   const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
-    fetch: (url, opts) => fetch(url.toString(), opts as any),
+    fetch: (url, opts) =>
+      globalThis.fetch(url.toString(), opts as RequestInit),
     authProvider,
   });
   return Object.assign(transport, {

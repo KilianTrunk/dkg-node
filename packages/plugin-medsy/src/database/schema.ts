@@ -42,7 +42,7 @@ export const premiumAccess = sqliteTable("premium_access", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: text("user_id").notNull(),
   noteId: text("note_id").notNull(),
-  paymentAmount: real("payment_amount").notNull(), // Mock payment amount
+  paymentAmount: real("payment_amount").notNull(), // Payment amount in TRAC tokens
   grantedAt: integer("granted_at", { mode: "timestamp" }).notNull(),
   expiresAt: integer("expires_at", { mode: "timestamp" }),
 });

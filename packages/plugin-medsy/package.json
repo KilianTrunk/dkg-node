@@ -6,19 +6,22 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "dev": "tsup src/*.ts --format cjs,esm --dts --watch",
-    "build": "tsup src/*.ts --format cjs,esm --dts",
+    "dev": "tsup --watch",
+    "build": "tsup",
     "check-types": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test": "mocha --loader ../../node_modules/tsx/dist/loader.mjs 'tests/**/*.spec.ts'",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node migrate.js"
+    "db:migrate": "node migrate.js",
+    "cli:agent-flow": "node --import tsx src/cli/agentToAgentFlow.ts"
   },
   "dependencies": {
     "@dkg/plugin-swagger": "^0.0.2",
     "@dkg/plugins": "^0.0.2",
     "@types/node": "^24.10.1",
     "better-sqlite3": "^11.3.0",
+    "boxen": "^7.1.1",
+    "chalk": "^5.3.0",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.36.0",
     "ethers": "^6.15.0",

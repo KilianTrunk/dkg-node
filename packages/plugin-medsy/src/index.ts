@@ -66,7 +66,7 @@ export default defineDkgPlugin((ctx, mcp, api) => {
 
       console.log(`Medsy Plugin ready!`);
       console.log(`   - Database: ${config.database.path}`);
-      console.log(`   - AI Provider: ${config.ai?.provider || 'Not configured'}`);
+      console.log(`   - AI/LLM: Using agent's configuration (apps/agent)`);
       console.log(`   - DKG Endpoint: ${config.dkg?.endpoint || 'Not configured'}`);
 
       // Register MCP tools using modular functions

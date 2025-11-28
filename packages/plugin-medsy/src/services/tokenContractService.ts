@@ -145,7 +145,7 @@ export class TokenContractService {
     const tokenConfig = getTokenConfig();
     console.log(`💸 Transferring ${ethers.formatUnits(amount, tokenConfig.NEURO.decimals)} NEURO to ${to}`);
 
-    const tx = await contract.transfer!(to, amount);
+    const tx = await (contract as any).transfer!(to, amount);
     await tx.wait();
 
     console.log("✅ NEURO transfer completed:", tx.hash);

@@ -44,9 +44,32 @@ export class TokenomicsService {
    * Stake TRAC tokens on a health note
    * Creates a real token transfer to a staking pool
    */
-  async stakeTokens(request: StakeRequest): Promise<StakeResult> {
+  async stakeTokens(request: StakeRequest, agent: AgentIdentity): Promise<StakeResult> {
     await this.initialize();
 
+    if (agent.privateKey) {
+      this.blockchainProvider.setSigner(agent.privateKey);
+    }
+
+    try {
+      return await this.tryStake(request);
+    } catch (error: any) {
+      if (error.message.includes("Insufficient TRAC balance")) {
+        console.log("⚠️ Insufficient balance with agent's wallet, trying with DKG wallet...");
+        const fallbackPrivateKey = process.env.DKG_PUBLISH_WALLET;
+        if (fallbackPrivateKey) {
+          this.blockchainProvider.setSigner(fallbackPrivateKey);
+          return await this.tryStake(request);
+        } else {
+          throw error;
+        }
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  private async tryStake(request: StakeRequest): Promise<StakeResult> {
     const { noteId, amount, position, reasoning } = request;
     const userId = "demo_user"; // Mock user ID for now
 
@@ -67,45 +90,38 @@ export class TokenomicsService {
       reasoning: reasoning?.substring(0, 100)
     });
 
-    try {
-      // Convert amount to token units
-      const stakeAmount = this.tokenService.parseTracAmount(amount.toString());
+    // Convert amount to token units
+    const stakeAmount = this.tokenService.parseTracAmount(amount.toString());
 
-      // Check user balance
-      const signer = this.blockchainProvider.getSigner();
-      const userAddress = await signer.getAddress();
-      const balance = await this.tokenService.getTracBalance(userAddress);
+    // Check user balance
+    const signer = this.blockchainProvider.getSigner();
+    const userAddress = await signer.getAddress();
+    const balance = await this.tokenService.getTracBalance(userAddress);
 
-      if (balance < stakeAmount) {
-        throw new Error(`Insufficient TRAC balance. Required: ${this.tokenService.formatTracAmount(stakeAmount)}, Available: ${this.tokenService.formatTracAmount(balance)}`);
-      }
-
-      // Generate staking pool address (for now, use a mock pool)
-      // TODO: Replace with real staking contract address
-      const stakingPoolAddress = this.generateStakingPoolAddress(noteId, position);
-
-      // Transfer tokens to staking pool
-      const tx = await this.tokenService.transferTrac(stakingPoolAddress, stakeAmount);
-
-      // Generate stake ID
-      const stakeId = `stake_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      console.log("✅ Token staking completed:", {
-        stakeId,
-        txHash: tx.hash,
-        amount: this.tokenService.formatTracAmount(stakeAmount),
-        pool: stakingPoolAddress
-      });
-
-      return {
-        stakeId,
-        communityConsensus: await this.getCommunityConsensus(noteId),
-        transactionHash: tx.hash
-      };
-    } catch (error) {
-      console.error("❌ Token staking failed:", error);
-      throw new Error(`Staking failed: ${error instanceof Error ? error.message : 'Unknown blockchain error'}`);
+    if (balance < stakeAmount) {
+      throw new Error(`Insufficient TRAC balance. Required: ${this.tokenService.formatTracAmount(stakeAmount)}, Available: ${this.tokenService.formatTracAmount(balance)}`);
     }
+
+    const stakingPoolAddress = this.generateStakingPoolAddress(noteId, position);
+
+    // Transfer tokens to staking pool
+    const tx = await this.tokenService.transferTrac(stakingPoolAddress, stakeAmount);
+
+    // Generate stake ID
+    const stakeId = `stake_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    console.log("✅ Token staking completed:", {
+      stakeId,
+      txHash: tx.hash,
+      amount: this.tokenService.formatTracAmount(stakeAmount),
+      pool: stakingPoolAddress
+    });
+
+    return {
+      stakeId,
+      communityConsensus: await this.getCommunityConsensus(noteId),
+      transactionHash: tx.hash
+    };
   }
 
   /**
@@ -278,7 +294,7 @@ export class TokenomicsService {
   /**
    * Get all stakes for a note
    */
-  private async getStakesForNote(noteId: string): Promise<Array<{userId: string, amount: number, position: string}>> {
+  private async getStakesForNote(noteId: string): Promise<Array<{ userId: string, amount: number, position: string }>> {
     try {
       const stakeResults = await db
         .select({
@@ -325,7 +341,7 @@ export class TokenomicsService {
   /**
    * Determine consensus position from stakes
    */
-  private determineConsensusPosition(stakes: Array<{userId: string, amount: number, position: string}>): string {
+  private determineConsensusPosition(stakes: Array<{ userId: string, amount: number, position: string }>): string {
     const supportTotal = stakes
       .filter(s => s.position === "support")
       .reduce((sum, s) => sum + s.amount, 0);

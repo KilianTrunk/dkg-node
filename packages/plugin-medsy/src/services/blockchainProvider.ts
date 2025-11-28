@@ -51,6 +51,14 @@ export class BlockchainProvider {
     return this.network.name || `chain-${this.network.chainId}`;
   }
 
+  setSigner(privateKey: string) {
+    if (!this.provider) {
+      throw new Error("Blockchain provider not initialized");
+    }
+    const wallet = new ethers.Wallet(privateKey, this.provider);
+    this.signer = wallet;
+  }
+
   async getBalance(address: string): Promise<bigint> {
     return await this.getProvider().getBalance(address);
   }

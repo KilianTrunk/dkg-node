@@ -5,6 +5,6 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "sqlite",
   dbCredentials: {
-    url: process.env.DATABASE_URL || "../apps/agent/database.db",
+    url: process.env.MEDSY_DATABASE_PATH || "../../apps/medsy.db",
   },
 });

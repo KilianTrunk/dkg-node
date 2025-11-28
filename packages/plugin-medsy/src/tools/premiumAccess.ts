@@ -23,7 +23,7 @@ export function registerPremiumAccessTool(
       description: "Pay for premium access to detailed health analysis and expert insights",
       inputSchema: PremiumAccessSchema.shape
     },
-    async ({ noteId, paymentAmount }) => {
+    async ({ noteId, paymentAmount, recipient }) => {
       try {
         const userId = "demo_user"; // Mock user ID
 

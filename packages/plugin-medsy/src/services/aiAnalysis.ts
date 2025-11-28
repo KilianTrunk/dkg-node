@@ -95,11 +95,11 @@ export class AIAnalysisService implements IAIAnalysisService {
       try {
         await this.ensureLLM();
       } catch (error) {
-        aiLogger.warn("LLM initialization failed, using mock analysis", { error });
+        aiLogger.error("LLM initialization failed", { error });
+        throw new Error("AI service not initialized - cannot perform analysis without LLM");
       }
     }
 
-    // Require real AI analysis - no mock fallbacks in production
     if (!this.llm) {
       throw new Error("AI service not initialized - cannot perform analysis without LLM");
     }
@@ -113,32 +113,37 @@ export class AIAnalysisService implements IAIAnalysisService {
     }
 
     // Create a structured prompt for health claim analysis
-    const systemPrompt = `You are a medical fact-checking AI that analyzes health claims for accuracy and reliability.
-Your task is to evaluate health claims based on current medical science and provide a structured analysis.
+    const systemPrompt = `You are a medical fact-checking AI. Analyze health claims and respond ONLY with valid JSON.
 
-For each claim, you must provide:
-1. A verdict: "true", "false", "misleading", or "uncertain"
-2. A confidence score: 0.0-1.0 (how confident you are in the verdict)
-3. A clear summary explaining the analysis
-4. Relevant medical sources that support your conclusion
+Verdict types:
+- "true": Supported by medical evidence
+- "false": Contradicts medical science
+- "misleading": Oversimplifies or misrepresents facts
+- "uncertain": Insufficient evidence
 
-Guidelines:
-- "true": Claim is supported by current medical evidence
-- "false": Claim contradicts established medical science
-- "misleading": Claim oversimplifies or misrepresents medical facts
-- "uncertain": Insufficient evidence or conflicting studies
-
-Be precise, evidence-based, and cite credible medical sources.`;
-
-    const userPrompt = `Please analyze this health claim: "${claim}"${context ? `\n\nAdditional context: ${context}` : ''}
-
-Provide your analysis in the following JSON format:
+You MUST respond with ONLY valid JSON in this exact format:
 {
   "verdict": "true|false|misleading|uncertain",
-  "confidence": 0.0-1.0,
-  "summary": "Clear explanation of your analysis",
-  "sources": ["Source 1", "Source 2", "Source 3"]
-}`;
+  "confidence": 0.85,
+  "summary": "Brief evidence-based explanation",
+  "sources": ["Source 1", "Source 2"]
+}
+
+Do NOT include any text before or after the JSON object.`;
+
+    const userPrompt = `Analyze this health claim: "${claim}"${context ? `\n\nContext: ${context}` : ''}
+
+CRITICAL: Respond ONLY with valid JSON. No explanatory text before or after the JSON.
+
+Required JSON format:
+{
+  "verdict": "true|false|misleading|uncertain",
+  "confidence": 0.85,
+  "summary": "Brief evidence-based explanation",
+  "sources": ["Medical source 1", "Medical source 2", "Medical source 3"]
+}
+
+Your response must be parseable JSON only.`;
 
     try {
       const response = await this.llm.invoke([
@@ -175,15 +180,29 @@ Provide your analysis in the following JSON format:
 
       aiLogger.info("Extracted content for parsing", { content: content.substring(0, 200) });
 
-      // Try to extract JSON from the content
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No JSON found in LLM response");
+      let jsonText = content;
+
+      const codeBlockMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+      if (codeBlockMatch) {
+        jsonText = codeBlockMatch[1];
+      } else {
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonText = jsonMatch[0];
+        }
       }
 
-      const parsed = JSON.parse(jsonMatch[0]);
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonText);
+      } catch (parseError) {
+        aiLogger.error("Failed to parse JSON", {
+          jsonText: jsonText.substring(0, 500),
+          originalContent: content.substring(0, 500)
+        });
+        throw new Error(`No valid JSON found in LLM response. Response started with: "${content.substring(0, 100)}..."`);
+      }
 
-      // Validate the response structure
       if (!parsed.verdict || !parsed.summary) {
         aiLogger.warn("Invalid response structure", { parsed });
         throw new Error("Invalid response structure from LLM - missing required fields");
@@ -215,65 +234,6 @@ Provide your analysis in the following JSON format:
       });
       throw new Error("Failed to analyze claim with AI");
     }
-  }
-
-  private async performMockAnalysis(claim: string, context?: string): Promise<AnalysisResult> {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Enhanced mock analysis based on keywords
-    const lowerClaim = claim.toLowerCase();
-
-    if (lowerClaim.includes("cure") && lowerClaim.includes("cancer")) {
-      return {
-        summary: "This claim oversimplifies cancer treatment and may mislead patients about proven therapies.",
-        confidence: 0.92,
-        verdict: "misleading",
-        sources: [
-          "American Cancer Society Treatment Guidelines",
-          "National Cancer Institute Clinical Trials Database",
-          "Peer-reviewed Oncology Journals"
-        ]
-      };
-    }
-
-    if (lowerClaim.includes("vaccine") && lowerClaim.includes("autism")) {
-      return {
-        summary: "Extensive scientific research has conclusively shown no link between vaccines and autism.",
-        confidence: 0.98,
-        verdict: "false",
-        sources: [
-          "Centers for Disease Control and Prevention (CDC)",
-          "World Health Organization (WHO)",
-          "Institute of Medicine Vaccine Safety Report"
-        ]
-      };
-    }
-
-    if (lowerClaim.includes("vitamin c") && lowerClaim.includes("cold")) {
-      return {
-        summary: "Vitamin C may slightly reduce cold duration but does not prevent or cure colds.",
-        confidence: 0.85,
-        verdict: "misleading",
-        sources: [
-          "Cochrane Review of Vitamin C for Colds",
-          "National Institutes of Health (NIH)",
-          "Mayo Clinic Research"
-        ]
-      };
-    }
-
-    // Default response for claims that need further verification
-    return {
-      summary: "This claim requires further verification against current medical research and guidelines.",
-      confidence: 0.60,
-      verdict: "uncertain",
-      sources: [
-        "General Medical Literature",
-        "PubMed Database",
-        "Medical Professional Consultation Recommended"
-      ]
-    };
   }
 
 }

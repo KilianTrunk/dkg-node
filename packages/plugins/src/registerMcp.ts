@@ -9,6 +9,7 @@ export const registerMcp = (
   getServer: () => McpServer,
 ) => {
   const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+  const servers: { [sessionId: string]: McpServer } = {};
 
   const handleSessionRequest: express.RequestHandler = async (req, res) => {
     const sessionId = req.headers["mcp-session-id"]?.toString() ?? "";
@@ -24,19 +25,22 @@ export const registerMcp = (
     const sessionId = req.headers["mcp-session-id"]?.toString() ?? "";
     let transport = transports[sessionId];
     if (!transport && isInitializeRequest(req.body)) {
+      const server = getServer();
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => uuidv7(),
         onsessioninitialized: (sessionId) => {
           transports[sessionId] = transport!;
+          servers[sessionId] = server;
         },
       });
       transport.onerror = console.error.bind(console);
       transport.onclose = () => {
         if (transport?.sessionId) {
           delete transports[transport.sessionId];
+          delete servers[transport.sessionId];
         }
       };
-      await getServer().connect(transport);
+      await server.connect(transport);
     }
     if (!transport) {
       res.status(400).json({

@@ -9,9 +9,6 @@ import { createServiceLogger } from "../services/Logger";
 
 const logger = createServiceLogger("PublishNoteTool");
 
-/**
- * Publish Health Community Note MCP Tool
- */
 export function registerPublishNoteTool(
   mcp: McpServer,
   ctx: DkgContext,
@@ -22,41 +19,52 @@ export function registerPublishNoteTool(
     "publish-health-note",
     {
       title: "Publish Health Community Note",
-      description: "Publish a verified health claim analysis as a Community Note on the DKG",
+      description: "Publish a verified health claim analysis as a Community Note on the DKG. When fact-checking content from the Guardian Social Graph, include the 'annotates' parameter to link the note to the original asset.",
       inputSchema: PublishNoteSchema.shape
     },
-    async ({ claimId, summary, confidence, verdict, sources }) => {
+    async ({ claimId, summary, confidence, verdict, sources, annotates }) => {
       try {
-        logger.info("Publishing health community note", { claimId, verdict, confidence });
+        logger.info("Publishing health community note", {
+          claimId,
+          verdict,
+          confidence,
+          hasAnnotation: !!annotates
+        });
 
-        // Generate noteId first
         const noteId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-        // Find related knowledge assets before publishing
+        const claimRecord = await db.select()
+          .from(healthClaims)
+          .where(eq(healthClaims.claimId, claimId))
+          .limit(1);
+
+        const claim = claimRecord?.[0]?.claim || "Health claim";
+
         const relatedUals = await dkgService.findRelatedUals(summary, 5);
 
-        // Create JSON-LD for DKG Knowledge Asset (unwrapped)
-        const noteContent = {
-          "@context": "https://schema.org/",
-          "@type": "MedicalWebPage",
-          "@id": `urn:health-note:${claimId}`,
-          "name": "Health Claim Community Note",
-          "description": summary,
-          "verdict": verdict,
-          "confidence": confidence,
-          "sources": sources,
-          "datePublished": new Date().toISOString(),
-          "publisher": {
-            "@type": "Organization",
-            "name": "Medsy AI"
-          }
+        const noteData = {
+          claimId,
+          noteId,
+          claim,
+          agentId: "medsy-mcp-tool",
+          agentName: "Medsy AI",
+          verdict,
+          confidence,
+          summary,
+          sources,
+          publishedAt: new Date().toISOString()
         };
 
-        // Publish to DKG using real Edge Node, connecting to existing assets
-        const result = await dkgService.publishKnowledgeAsset(noteContent, "public", relatedUals);
+        logger.info("Publishing Knowledge Asset", {
+          noteId,
+          claimId,
+          verdict,
+          annotates: annotates?.id || "none",
+          relatedAssets: relatedUals.length
+        });
 
-        // Store minimal metadata locally for relationships and quick access
-        // The actual Knowledge Asset lives on DKG and is discoverable network-wide
+        const result = await dkgService.publishKnowledgeAsset(noteData, "public", relatedUals);
+
         await db.insert(communityNotes).values({
           noteId,
           claimId,
@@ -69,17 +77,43 @@ export function registerPublishNoteTool(
           updatedAt: new Date(),
         });
 
-        // Update claim status to track analysis completion
         await db.update(healthClaims)
           .set({ status: "published", updatedAt: new Date() })
           .where(eq(healthClaims.claimId, claimId));
 
-        logger.info("Community note published successfully", { noteId, ual: result.UAL, claimId });
+        logger.info("Community note published successfully", {
+          noteId,
+          ual: result.UAL,
+          claimId,
+          annotates: annotates?.id
+        });
+
+        let responseText = `Community Note published successfully!\n\n`;
+        responseText += `📋 **Note Details**\n`;
+        responseText += `• UAL: ${result.UAL}\n`;
+        responseText += `• Note ID: ${noteId}\n`;
+        responseText += `• Verdict: ${verdict.toUpperCase()}\n`;
+        responseText += `• Confidence: ${(confidence * 100).toFixed(1)}%\n\n`;
+
+        if (annotates) {
+          responseText += `🔗 **Linked to Guardian Social Graph**\n`;
+          responseText += `• Original: ${annotates.id}\n`;
+          if (annotates.ual) {
+            responseText += `• Guardian UAL: ${annotates.ual}\n`;
+          }
+          if (annotates.headline) {
+            responseText += `• Headline: ${annotates.headline}\n`;
+          }
+          responseText += `\n`;
+        }
+
+        responseText += `🌐 **View on DKG:** https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(result.UAL)}\n\n`;
+        responseText += `💎 **Premium Access Available**: Pay TRAC for enhanced analysis with expert commentary, medical citations, and comprehensive assessment.`;
 
         return {
           content: [{
             type: "text",
-            text: `Community Note published successfully!\n\n🔗 **DKG Permanent Record:** https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(result.UAL)}\nNote ID: ${noteId}\nVerdict: ${verdict.toUpperCase()}\nConfidence: ${(confidence * 100).toFixed(1)}%\n\n💎 **Premium Access Available**: Pay 0.01 TRAC for enhanced analysis with expert commentary, medical citations, statistical data, and comprehensive bias assessment.`
+            text: responseText
           }],
           noteId,
           ual: result.UAL

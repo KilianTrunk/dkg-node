@@ -80,7 +80,8 @@ export default function Login() {
           code: code ?? "",
           credentials: { email, password },
           rememberMe,
-          fetch: (url, opts) => fetch(url.toString(), opts as any),
+          fetch: (url, opts) =>
+            globalThis.fetch(url.toString(), opts as RequestInit),
         });
         if (url.startsWith(clientUri))
           router.navigate({
@@ -190,9 +191,9 @@ export default function Login() {
                 fontWeight: "600",
                 color: colors.text,
                 marginBottom: 10,
-                fontFamily: "SpaceGrotesk_600SemiBold",
+                fontFamily: "Manrope_600SemiBold",
               }}>
-                Secure Login
+                Login
               </Text>
               <Text style={{
                 fontSize: 15,

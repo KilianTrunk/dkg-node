@@ -166,7 +166,9 @@ export default function ChatPage() {
     async (ual) => {
       try {
         const resource = await mcp.readResource({ uri: ual });
-        const content = resource.contents[0]?.text as string;
+        const getText = (c: any) =>
+          typeof c?.text === "string" ? c.text : typeof c?.blob === "string" ? c.blob : undefined;
+        const content = getText(resource.contents[0]);
         if (!content) throw new Error("Resource not found");
 
         const parsedContent = JSON.parse(content);
@@ -197,14 +199,14 @@ export default function ChatPage() {
           splitUal.pop();
           const kcUal = splitUal.join("/");
           const resource = await mcp.readResource({ uri: kcUal });
-          const content = resource.contents[0]?.text as string;
-          if (!content) {
+          const kcContent = getText(resource.contents[0]);
+          if (!kcContent) {
             resolved.publisher = "unknown";
             resolved.txHash = "unknown";
             return resolved;
           }
 
-          const parsedContent = JSON.parse(content);
+          const parsedContent = JSON.parse(kcContent);
           resolved.txHash =
             parsedContent.metadata
               .at(0)
