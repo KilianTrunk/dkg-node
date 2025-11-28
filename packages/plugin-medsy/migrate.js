@@ -1,64 +1,73 @@
 #!/usr/bin/env node
 
 /**
- * Database migration script for DKG Publisher Plugin
- * This script runs Drizzle migrations to create/update database tables
+ * Database migration script for Medsy Plugin
+ * This script runs Drizzle migrations to create/update SQLite database tables
  */
 
-const { drizzle } = require("drizzle-orm/mysql2");
-const { migrate } = require("drizzle-orm/mysql2/migrator");
-const mysql = require("mysql2/promise");
-const dotenv = require("dotenv");
+const Database = require("better-sqlite3");
+const { drizzle } = require("drizzle-orm/better-sqlite3");
+const { migrate } = require("drizzle-orm/better-sqlite3/migrator");
 const path = require("path");
+const fs = require("fs");
+const dotenv = require("dotenv");
 
-// Load environment variables
-dotenv.config({ path: ".env.publisher" });
-dotenv.config(); // Also load from .env if present
+// Load environment variables from .env.medsy
+const envPath = path.join(__dirname, ".env.medsy");
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+}
+dotenv.config(); // Also load from root .env if present
 
 async function runMigrations() {
-  console.log("🚀 Starting database migrations...");
+  console.log("🚀 Starting Medsy database migrations...");
 
-  // Get database URL from environment
-  const databaseUrl = process.env.DKGP_DATABASE_URL;
+  // Get database path - use same database as agent (matches plugin code)
+  // Priority: DATABASE_URL > MEDSY_DATABASE_PATH > default to agent's database.db
+  const dbPath = process.env.DATABASE_URL || 
+                 process.env.MEDSY_DATABASE_PATH || 
+                 path.resolve(__dirname, "../../apps/agent/database.db");
+  console.log(`📊 Database path: ${dbPath}`);
 
-  if (!databaseUrl) {
-    console.error("❌ DKGP_DATABASE_URL not found in environment variables");
-    console.log("Make sure you have run the setup script: npm run setup");
-    process.exit(1);
+  // Ensure directory exists
+  const dbDir = path.dirname(dbPath);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
   }
 
-  console.log("📊 Connecting to database...");
-
-  let connection;
   try {
-    // Create connection
-    connection = mysql.createPool(databaseUrl);
+    // Create SQLite connection
+    const sqlite = new Database(dbPath);
+    sqlite.pragma("journal_mode = WAL"); // Enable WAL mode for better concurrency
 
     // Create Drizzle instance
-    const db = drizzle(connection);
+    const db = drizzle(sqlite);
 
     // Run migrations
     console.log("🔧 Running migrations...");
-    await migrate(db, {
-      migrationsFolder: path.join(__dirname, "src/database/migrations"),
+    migrate(db, {
+      migrationsFolder: path.join(__dirname, "drizzle"),
     });
 
     console.log("✅ Migrations completed successfully!");
 
     // Verify tables were created
-    const [tables] = await connection.execute("SHOW TABLES");
+    const tables = sqlite
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+      )
+      .all();
     console.log(
-      `📋 Created ${tables.length} tables:`,
-      tables.map((t) => Object.values(t)[0]).join(", "),
+      `📋 Found ${tables.length} tables:`,
+      tables.map((t) => t.name).join(", ")
     );
+
+    sqlite.close();
+    console.log("🔌 Database connection closed");
   } catch (error) {
     console.error("❌ Migration failed:", error.message);
+    console.error(error.stack);
     process.exit(1);
-  } finally {
-    if (connection) {
-      await connection.end();
-      console.log("🔌 Database connection closed");
-    }
   }
 }
 

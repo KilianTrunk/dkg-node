@@ -117,8 +117,8 @@ npm run build
 #### Medsy plugin (`packages/plugin-medsy/.env.medsy`)
 
 ```bash
-# Database
-MEDSY_DATABASE_PATH="./medsy.db"
+# Database (optional - defaults to apps/agent/database.db)
+# MEDSY_DATABASE_PATH="./custom-path.db"  # Only set if using a different database
 
 # AI
 MEDSY_AI_PROVIDER="groq"
@@ -146,30 +146,59 @@ LOG_LEVEL="info"
 ### 3. Bootstrap databases
 
 ```bash
-# Agent DB
+# Agent DB (creates database.db with user/auth tables)
 cd apps/agent
 npm run build:scripts
 npm run script:setup   # creates admin user and SQLite DB
 
-# Medsy DB
+# Medsy plugin migrations (adds health claim tables to same database.db)
 cd ../../packages/plugin-medsy
-npm run db:migrate
+npm run db:migrate     # runs migrations on apps/agent/database.db
 ```
+
+**Note:** Medsy plugin uses the same `database.db` file as the agent. The migration adds Medsy-specific tables (health_claims, community_notes, stakes, etc.) to the existing database.
 
 ### 4. Run in development
 
-From repo root:
+The full stack requires **3 separate terminals** to run all services:
+
+#### Terminal 1: Start Blazegraph (Triple Store)
 
 ```bash
+cd dkg-engine/blazegraph
+java -jar blazegraph.jar
+```
+
+Runs on **port 9999**
+
+#### Terminal 2: Start DKG Engine
+
+```bash
+cd dkg-engine/current
+node index.js
+```
+
+Runs on **port 8900**
+
+#### Terminal 3: Start Agent
+
+```bash
+# From repo root
+dkg-cli run-dev
+# OR
 npm run dev
 ```
+
+Runs on **port 9200**
 
 This starts:
 
 - **Frontend**: `http://localhost:8081` (Expo web app)  
 - **Backend**: `http://localhost:9200` (MCP server + REST API)  
 - **Medsy API**: `http://localhost:9200/health/*`  
-- **Metrics**: `http://localhost:9200/health/metrics`  
+- **Metrics**: `http://localhost:9200/health/metrics`
+
+**Note:** All three services must be running for the full stack to work. The DKG Engine depends on Blazegraph, and the Agent depends on the DKG Engine.  
 
 ---
 
@@ -295,6 +324,75 @@ npm run test:api         # Plugin / API tests
 npm run test:integration # Cross-plugin integration tests
 npm run test:e2e         # Playwright UI tests
 npm test                 # Run all tests
+```
+
+---
+
+## 🔍 Troubleshooting & Debugging
+
+### Database issues
+
+If you encounter database-related errors or need to inspect your database:
+
+#### Using Drizzle Studio
+
+**Drizzle Studio** provides a web-based interface to view and manage your SQLite databases:
+
+```bash
+# From repo root
+npm run drizzle:studio
+```
+
+Then open [https://local.drizzle.studio](https://local.drizzle.studio) in your browser.
+
+#### Manual migration execution
+
+If automatic migrations fail, you can run them manually:
+
+**Agent database migrations:**
+- Location: `apps/agent/drizzle/sqlite/`
+- Run manually via Drizzle Studio or execute SQL files directly
+
+**Medsy plugin database migrations:**
+- Location: `packages/plugin-medsy/drizzle/`
+- Migration file: `0000_health_notes.sql`
+- **Important:** Medsy uses the same `database.db` file as the agent (located at `apps/agent/database.db`)
+- To run manually:
+  1. Open Drizzle Studio: `npm run drizzle:studio`
+  2. Navigate to the database: `apps/agent/database.db`
+  3. Execute the SQL from `packages/plugin-medsy/drizzle/0000_health_notes.sql`
+
+#### Common database fixes
+
+```bash
+# Reset Agent database (this also resets Medsy tables since they share the same DB)
+cd apps/agent
+rm database.db database.db-shm database.db-wal
+npm run script:setup
+
+# Re-run Medsy migrations (adds Medsy tables back to database.db)
+cd ../packages/plugin-medsy
+npm run db:migrate
+```
+
+### Build issues
+
+```bash
+# Clean and rebuild
+rm -rf node_modules package-lock.json
+npm install
+npm run build
+```
+
+### TypeScript errors
+
+```bash
+# Check types across all packages
+npm run check-types
+
+# Reinstall dependencies
+npm install
+npm run build
 ```
 
 ---

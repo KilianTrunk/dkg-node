@@ -1,0 +1,14 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1732838400000,
+      "tag": "0000_health_notes",
+      "breakpoints": true
+    }
+  ]
+}
+
