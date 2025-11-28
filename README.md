@@ -173,6 +173,29 @@ This starts:
 
 ---
 
+## 🤝 Agent‑to‑Agent demo flow
+
+To run the Medsy **agent‑to‑agent** demonstration flow:
+
+1. **Switch to the `agent-2-agent` branch** (on GitHub or locally):  
+   `https://github.com/KilianTrunk/dkg-node/tree/agent-2-agent`
+2. From the `dkg-node/packages/plugin-medsy` directory, build the CLI:
+
+```bash
+cd packages/plugin-medsy
+npm run build
+```
+
+3. Still in `packages/plugin-medsy`, start the agent‑to‑agent flow:
+
+```bash
+npm run cli:agent-flow
+```
+
+This executes the end‑to‑end Medsy workflow where one agent verifies a health claim and another agent consumes the resulting Community Note and on‑chain signals.
+
+---
+
 ## 🔬 Medsy Health Verification API
 
 ### Health claims analysis
